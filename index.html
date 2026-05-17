@@ -2313,17 +2313,8 @@ function chStartThrowerScreen(){
       return;
     }
 
-    // Player lost all lives naturally — show opponent lost stats
+    // Player lost all lives naturally — handled above via gameOver check
     console.log('[CH-THROWER] gameState:', JSON.stringify(room.gameState));
-    if(room.gameState.playerLost){
-      chStopListener();
-      clearTimeout(ch.cooldownTimer);
-      document.querySelectorAll('.ch-note-btn').forEach(b=>b.disabled=true);
-      chShowThrowerStats(room.gameState, 'OPPONENT LOST');
-      const savedCode=ch.code; ch.code=null; ch.role=null; ch.myRole=null;
-      setTimeout(()=>chClear(savedCode),2000);
-      return;
-    }
 
     // Pause sync — player paused → thrower sees waiting message, no actions
     const isPaused = room.gameState.paused && !room.gameState.throwerPaused;
@@ -2355,7 +2346,7 @@ function chStartThrowerScreen(){
         </div>`).join('');
     }
 
-    if(room.gameState.gameOver){ chStopListener(); chHandleGameOver(room.gameState); }
+    if(room.gameState.playerLost){ chStopListener(); clearTimeout(ch.cooldownTimer); document.querySelectorAll('.ch-note-btn').forEach(b=>b.disabled=true); chShowThrowerStats(room.gameState,'OPPONENT LOST'); const sc=ch.code; ch.code=null; ch.role=null; ch.myRole=null; setTimeout(()=>chClear(sc),2000); return; }
   }, 200);
 }
 
