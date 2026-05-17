@@ -456,6 +456,8 @@ canvas#gameCanvas { position:absolute; top:0; left:0; width:100%; height:100%; }
         </div>
         <div id="sidebar-user-info">Not logged in</div>
       </div>
+      <!-- Back button shown only when panel is open (icon strip mode) -->
+      <div id="sidebar-back-btn" onclick="closeSidebarPanel()" style="display:none;padding:14px 0;text-align:center;cursor:pointer;color:var(--accent);font-size:1.1rem;border-bottom:1px solid var(--border);flex-shrink:0;" title="Back">←</div>
       <nav id="sidebar-nav">
         <div class="nav-item" data-panel="account" onclick="openPanel('account')">
           <span class="nav-icon">◉</span> Account
@@ -479,6 +481,10 @@ canvas#gameCanvas { position:absolute; top:0; left:0; width:100%; height:100%; }
   ══════════════════════════════ -->
   <div id="sidebar-panel">
     <div id="sidebar-panel-inner">
+      <div style="display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--border);flex-shrink:0;">
+        <button onclick="closeSidebarPanel()" style="width:32px;height:32px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'">←</button>
+        <div id="sp-panel-title" style="font-family:'Orbitron',sans-serif;font-size:0.85rem;font-weight:900;color:var(--text);letter-spacing:3px;"></div>
+      </div>
 
       <!-- ACCOUNT PANEL -->
       <div id="panel-account" class="sp-content" style="display:none;">
@@ -1052,7 +1058,10 @@ function toggleSidebar(){
   const bd=document.getElementById('sidebar-backdrop');
   sb.classList.toggle('open',sidebarOpen);
   bd.classList.toggle('visible',sidebarOpen);
-  if(!sidebarOpen){ closeSidebarPanel(); }
+  if(!sidebarOpen){
+    closeSidebarPanel();
+    document.getElementById('sidebar-back-btn').style.display='none';
+  }
 }
 
 function openPanel(panel){
@@ -1061,10 +1070,14 @@ function openPanel(panel){
   currentPanel=panel;
   // Collapse sidebar to icon strip, panel takes the space
   document.getElementById('sidebar').classList.add('panel-open');
+  document.getElementById('sidebar-back-btn').style.display='block';
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.panel===panel));
   document.getElementById('sidebar-panel').classList.add('open');
   document.querySelectorAll('.sp-content').forEach(p=>p.style.display='none');
   document.getElementById('panel-'+panel).style.display='block';
+  // Set panel title
+  const titles={account:'ACCOUNT',dashboard:'DASHBOARD',settings:'SETTINGS',help:'HELP'};
+  document.getElementById('sp-panel-title').textContent=titles[panel]||panel.toUpperCase();
   if(panel==='account') refreshAccountPanel();
   if(panel==='dashboard') refreshDashboardPanel();
 }
@@ -1072,6 +1085,7 @@ function openPanel(panel){
 function closeSidebarPanel(){
   currentPanel=null;
   document.getElementById('sidebar').classList.remove('panel-open');
+  document.getElementById('sidebar-back-btn').style.display='none';
   document.getElementById('sidebar-panel').classList.remove('open');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
 }
