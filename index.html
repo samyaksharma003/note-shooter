@@ -1967,6 +1967,7 @@ function chStartListener(code, onUpdate){
   ch._ref=firebase.database().ref('rooms/'+code);
   ch._ref.on('value', snap=>{
     ch._cache=snap.val();
+    console.log('[CH] Firebase update:', JSON.stringify(ch._cache));
     if(ch._onUpdate) ch._onUpdate(ch._cache);
   });
 }
@@ -2168,20 +2169,20 @@ let chCountdownValue = 0;
 function chStartCountdown(){
   chCountdownValue = 7;
   chUpdateCountdownUI();
+  console.log('[CH] Starting countdown, role:', ch.role, 'cache:', JSON.stringify(ch._cache));
 
-  // Write initial countdown to Firebase
   firebase.database().ref('rooms/'+ch.code+'/countdown').set(7);
 
   chClearCountdown();
 
   if(ch.role === 'creator'){
-    // Only the creator ticks the countdown — joiner watches Firebase
     chCountdownInterval = setInterval(()=>{
-      // Use live cache to check ready states
       const room = ch._cache;
+      console.log('[CH] Tick, cache:', JSON.stringify(room));
       if(!room) return;
       const creatorReady = room.creator?.ready || false;
       const joinerReady  = room.joiner?.ready  || false;
+      console.log('[CH] creatorReady:', creatorReady, 'joinerReady:', joinerReady);
 
       if(!creatorReady || !joinerReady){
         // Someone unreadied — stop countdown
@@ -2247,7 +2248,8 @@ function chReadyChange(){
     ? document.getElementById('ch-creator-ready-cb').checked
     : document.getElementById('ch-joiner-ready-cb').checked;
 
-  // Write directly to Firebase
+  console.log('[CH] chReadyChange role:', ch.role, 'ready:', myReady, 'code:', ch.code, 'cache:', JSON.stringify(ch._cache));
+
   const path = ch.role==='creator' ? 'creator/ready' : 'joiner/ready';
   if(ch.code) firebase.database().ref('rooms/'+ch.code+'/'+path).set(myReady);
 
