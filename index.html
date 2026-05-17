@@ -1825,20 +1825,15 @@ function confirmExitGame(){
 
 function endGame(){
   if(state.gameMode==='challenge'){
-    // Player ran out of lives — natural game over
     state.running=false; stopMic();
-    chStopListener();
     const myCode=ch.code;
-    const room=chRead(myCode);
-    if(room){
-      if(!room.gameState) room.gameState={notes:[],thrownCount:0,gameOver:false,livesLostAt:{}};
-      room.gameState.gameOver=true;
-      room.gameState.playerLost=true;
-      chWrite(myCode,room);
-    }
+    // Write directly to Firebase — no chRead needed
+    firebase.database().ref('rooms/'+myCode+'/gameState/gameOver').set(true);
+    firebase.database().ref('rooms/'+myCode+'/gameState/playerLost').set(true);
+    // Stop listener after writing
+    chStopListener();
     setTimeout(()=>chClear(myCode),4000);
     ch.code=null; ch.myRole=null;
-    // Per PDF: player sees their own score/stats with Back to Home
     chShowPlayerStats('GAME OVER');
     return;
   }
@@ -2570,19 +2565,15 @@ function chEndChallenge(){
   const myCode = ch.code;
   const myRole = ch.myRole;
 
-  // Write the left flag — do it twice 100ms apart to ensure it lands
+  // Write left flag directly to Firebase — no chRead needed
   function writeLeftFlag(){
-    const room = chRead(myCode) || {creator:{role:null,ready:false},joiner:null};
-    if(!room.gameState) room.gameState={notes:[],thrownCount:0,gameOver:false,score:0,paused:false,playerLeft:false,throwerLeft:false,livesLostAt:{}};
-    if(myRole==='player') room.gameState.playerLeft=true;
-    else room.gameState.throwerLeft=true;
-    room.gameState.gameOver=true;
-    chWrite(myCode, room);
+    firebase.database().ref('rooms/'+myCode+'/gameState/gameOver').set(true);
+    if(myRole==='player') firebase.database().ref('rooms/'+myCode+'/gameState/playerLeft').set(true);
+    else firebase.database().ref('rooms/'+myCode+'/gameState/throwerLeft').set(true);
   }
   writeLeftFlag();
-  setTimeout(writeLeftFlag, 100); // second write for safety
-  setTimeout(writeLeftFlag, 400); // third write for safety
-  // Clear room after 6s — enough time for other tab's poll (runs every 150ms) to catch it
+  setTimeout(writeLeftFlag, 200);
+  setTimeout(writeLeftFlag, 600);
   setTimeout(()=>chClear(myCode), 6000);
 
   // Per PDF: exiting player goes directly to home
