@@ -2009,13 +2009,14 @@ function chCreate(){
   ch.role = 'creator';
   ch.myRole = null;
 
+  // Note: Firebase deletes keys set to null — use 'empty' as sentinel instead
   chWrite(code, {
-    creator:{ role:null, ready:false },
-    joiner:null,
+    creator:{ role:'none', ready:false },
+    joiner:'empty',
     initialCooldownMs: ch.initialCooldownMs,
   });
 
-  // Reset cooldown picker to current value
+  // Reset cooldown picker
   ch.initialCooldownMs = 3000;
   const cdVal = document.getElementById('ch-cooldown-val');
   if(cdVal) cdVal.textContent = '3.0s';
@@ -2035,7 +2036,8 @@ function chCreate(){
   // Listen for joiner via Firebase
   chStartListener(code, room=>{
     if(!room) return;
-    if(room.joiner !== null){
+    // joiner joined when it's no longer 'empty'
+    if(room.joiner && room.joiner !== 'empty'){
       document.getElementById('ch-waiting-msg').style.display='none';
       document.getElementById('ch-creator-ready-section').style.display='flex';
       chPollCreator(room);
@@ -2046,7 +2048,7 @@ function chCreate(){
 function chPollCreator(room){
   if(!room) room=ch._cache;
   if(!room) return;
-  const friendRole = room.joiner?.role || null;
+  const friendRole = (room.joiner?.role && room.joiner.role !== 'none') ? room.joiner.role : null;
   const friendReady = room.joiner?.ready || false;
 
   // Conflict: both picked same role
@@ -2059,7 +2061,7 @@ function chPollCreator(room){
     document.getElementById('ch-creator-ready-cb').disabled = true;
     // Uncheck if it was checked
     document.getElementById('ch-creator-ready-cb').checked = false;
-    const r = chRead(ch.code); if(r){ r.creator.ready=false; chWrite(ch.code,r); }
+    if(ch.code) firebase.database().ref('rooms/'+ch.code+'/creator/ready').set(false);
   } else {
     document.getElementById('ch-creator-role-thrower').classList.remove('conflict');
     document.getElementById('ch-creator-role-player').classList.remove('conflict');
@@ -2089,14 +2091,14 @@ function chJoin(){
   firebase.database().ref('rooms/'+code).once('value').then(snap=>{
     const room = snap.val();
     if(!room){ msg.textContent='Room not found. Check the code.'; return; }
-    if(room.joiner !== null){ msg.textContent='Room is already full.'; return; }
+    if(room.joiner !== 'empty'){ msg.textContent='Room is already full.'; return; }
 
     ch.code = code;
     ch.role = 'joiner';
     ch.myRole = null;
 
-    // Write joiner in
-    room.joiner = { role:null, ready:false };
+    // Write joiner in — replace 'empty' sentinel with actual joiner object
+    room.joiner = { role:'none', ready:false };
     chWrite(code, room);
 
     chHideAll();
@@ -2119,7 +2121,7 @@ function chJoin(){
 function chPollJoiner(room){
   if(!room) room=ch._cache;
   if(!room) return;
-  const friendRole = room.creator?.role || null;
+  const friendRole = (room.creator?.role && room.creator.role !== 'none') ? room.creator.role : null;
   const friendReady = room.creator?.ready || false;
 
   const conflict = ch.myRole && friendRole && ch.myRole === friendRole;
@@ -2130,7 +2132,7 @@ function chPollJoiner(room){
     document.getElementById('ch-joiner-conflict-msg').textContent = `Friend also chose ${friendRole} — one of you must switch`;
     document.getElementById('ch-joiner-ready-cb').disabled = true;
     document.getElementById('ch-joiner-ready-cb').checked = false;
-    const r = chRead(ch.code); if(r){ r.joiner.ready=false; chWrite(ch.code,r); }
+    if(ch.code) firebase.database().ref('rooms/'+ch.code+'/joiner/ready').set(false);
   } else {
     document.getElementById('ch-joiner-role-thrower').classList.remove('conflict');
     document.getElementById('ch-joiner-role-player').classList.remove('conflict');
