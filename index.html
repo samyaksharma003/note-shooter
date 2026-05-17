@@ -42,48 +42,54 @@ body {
 }
 
 /* ═══════════════════════════════════════
-   LAYOUT — sidebar + main
+   LAYOUT — sidebar overlays, main untouched
 ═══════════════════════════════════════ */
-#app { display:flex; height:100vh; }
+#app { display:flex; height:100vh; position:relative; }
 
-/* ── SIDEBAR ── */
+/* ── SIDEBAR — fixed overlay, never pushes main content ── */
 #sidebar {
+  position:fixed; top:0; left:0; bottom:0;
   width:0; overflow:hidden;
   background:var(--panel); border-right:1px solid var(--border);
   display:flex; flex-direction:column;
-  transition:width 0.25s ease; flex-shrink:0; z-index:100;
+  transition:width 0.25s ease; z-index:200;
 }
+/* When open with no panel: show full sidebar */
 #sidebar.open { width:260px; }
+/* When panel is open: collapse sidebar to icon strip */
+#sidebar.open.panel-open { width:52px; }
+
 #sidebar-inner { width:260px; display:flex; flex-direction:column; height:100%; }
 
 #sidebar-header {
-  padding:18px 20px 14px;
+  padding:14px 14px 12px;
   border-bottom:1px solid var(--border);
-  display:flex; flex-direction:column; gap:4px;
+  display:flex; flex-direction:column; gap:4px; overflow:hidden;
 }
 #sidebar-app-name {
   font-family:'Orbitron',sans-serif; font-size:0.78rem;
   font-weight:900; color:var(--accent); letter-spacing:3px;
+  white-space:nowrap; overflow:hidden;
 }
-#sidebar-user-info { font-size:0.68rem; color:var(--text3); }
+#sidebar-user-info { font-size:0.65rem; color:var(--text3); white-space:nowrap; overflow:hidden; }
 
-#sidebar-nav { flex:1; padding:12px 0; overflow-y:auto; }
+#sidebar-nav { flex:1; padding:8px 0; overflow-y:auto; overflow-x:hidden; }
 
 .nav-item {
   display:flex; align-items:center; gap:12px;
-  padding:11px 20px; cursor:pointer;
+  padding:13px 17px; cursor:pointer;
   font-size:0.75rem; color:var(--text2);
   border-left:2px solid transparent;
-  transition:all 0.15s;
+  transition:all 0.15s; white-space:nowrap;
 }
 .nav-item:hover { background:var(--panel2); color:var(--text); }
 .nav-item.active { color:var(--accent); border-left-color:var(--accent); background:var(--accent-dim); }
-.nav-icon { font-size:0.9rem; width:18px; text-align:center; opacity:0.7; }
+.nav-icon { font-size:1rem; width:20px; text-align:center; flex-shrink:0; }
 
 #sidebar-footer {
-  padding:14px 20px;
+  padding:12px 17px;
   border-top:1px solid var(--border);
-  font-size:0.62rem; color:var(--text3);
+  font-size:0.6rem; color:var(--text3); white-space:nowrap; overflow:hidden;
 }
 #sidebar-close {
   width:24px; height:24px; border-radius:4px;
@@ -94,16 +100,23 @@ body {
 }
 #sidebar-close:hover { border-color:var(--accent2); color:var(--accent2); }
 
-/* ── SIDEBAR OVERLAY PANEL (slides in from left over game) ── */
+/* Dim backdrop when sidebar open on mobile */
+#sidebar-backdrop {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4);
+  z-index:199;
+}
+#sidebar-backdrop.visible { display:block; }
+
+/* ── SIDEBAR PANEL — takes full screen minus icon strip ── */
 #sidebar-panel {
-  position:fixed; top:0; left:260px; bottom:0;
-  width:380px; max-width:calc(100vw - 260px);
+  position:fixed; top:0; left:52px; bottom:0;
+  width:calc(100vw - 52px); max-width:440px;
   background:var(--panel); border-right:1px solid var(--border);
-  z-index:99; display:none; flex-direction:column;
-  overflow-y:auto;
+  z-index:201; display:none; flex-direction:column;
+  overflow-y:auto; box-shadow:4px 0 20px rgba(0,0,0,0.2);
 }
 #sidebar-panel.open { display:flex; }
-#sidebar-panel-inner { padding:24px 24px 40px; display:flex; flex-direction:column; gap:20px; }
+#sidebar-panel-inner { padding:20px 20px 40px; display:flex; flex-direction:column; gap:18px; }
 
 .sp-title {
   font-family:'Orbitron',sans-serif; font-size:0.85rem;
@@ -113,8 +126,8 @@ body {
 .sp-section { display:flex; flex-direction:column; gap:10px; }
 .sp-section-label { font-size:0.52rem; color:var(--text3); letter-spacing:3px; text-transform:uppercase; }
 
-/* ── MAIN CONTENT ── */
-#main { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+/* ── MAIN CONTENT — always full width, sidebar overlays it ── */
+#main { width:100%; display:flex; flex-direction:column; overflow:hidden; }
 
 /* ═══════════════════════════════════════
    HEADER
@@ -428,6 +441,7 @@ canvas#gameCanvas { position:absolute; top:0; left:0; width:100%; height:100%; }
 </style>
 </head>
 <body class="dark acc-blue">
+<div id="sidebar-backdrop" onclick="toggleSidebar()"></div>
 <div id="app">
 
   <!-- ══════════════════════════════
@@ -658,7 +672,6 @@ canvas#gameCanvas { position:absolute; top:0; left:0; width:100%; height:100%; }
 
       <div id="game-controls">
         <button id="pause-btn" onclick="togglePause()">⏸</button>
-        <button id="exit-btn" onclick="exitToHome()">⏹</button>
       </div>
 
       <!-- PAUSE -->
@@ -1035,31 +1048,30 @@ let currentPanel=null;
 
 function toggleSidebar(){
   sidebarOpen=!sidebarOpen;
-  document.getElementById('sidebar').classList.toggle('open',sidebarOpen);
-  if(!sidebarOpen){
-    closeSidebarPanel();
-  }
+  const sb=document.getElementById('sidebar');
+  const bd=document.getElementById('sidebar-backdrop');
+  sb.classList.toggle('open',sidebarOpen);
+  bd.classList.toggle('visible',sidebarOpen);
+  if(!sidebarOpen){ closeSidebarPanel(); }
 }
 
 function openPanel(panel){
-  // If sidebar is closed, open it first
-  if(!sidebarOpen){ sidebarOpen=true; document.getElementById('sidebar').classList.add('open'); }
-  // If clicking same panel, toggle close
+  if(!sidebarOpen){ sidebarOpen=true; document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebar-backdrop').classList.add('visible'); }
   if(currentPanel===panel){ closeSidebarPanel(); return; }
   currentPanel=panel;
-  // Highlight nav item
+  // Collapse sidebar to icon strip, panel takes the space
+  document.getElementById('sidebar').classList.add('panel-open');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.panel===panel));
-  // Show panel
   document.getElementById('sidebar-panel').classList.add('open');
   document.querySelectorAll('.sp-content').forEach(p=>p.style.display='none');
   document.getElementById('panel-'+panel).style.display='block';
-  // Refresh content
   if(panel==='account') refreshAccountPanel();
   if(panel==='dashboard') refreshDashboardPanel();
 }
 
 function closeSidebarPanel(){
   currentPanel=null;
+  document.getElementById('sidebar').classList.remove('panel-open');
   document.getElementById('sidebar-panel').classList.remove('open');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
 }
@@ -1698,6 +1710,7 @@ async function startGame(){
   document.getElementById('stats').style.display='flex';
   document.getElementById('game-controls').classList.add('visible');
   document.getElementById('pause-btn').textContent='⏸';
+  document.getElementById('pause-overlay').style.display='none';
   // Scale label
   const sl=document.getElementById('scale-mode-label');
   if(state.gameMode==='scale'){sl.textContent=`${scaleState.root} ${scaleState.type}  ·  ${currentScaleNotes().join(' ')}`;sl.style.display='block';}
@@ -1739,13 +1752,55 @@ function togglePause(){
   const po=document.getElementById('pause-overlay');
   const pb=document.getElementById('pause-btn');
   if(state.paused){
-    state.running=false;po.style.display='flex';pb.textContent='▶';
+    state.running=false;
+    pb.textContent='▶';
     if(state.timerInterval)clearInterval(state.timerInterval);
+    // Show pause modal with current score
+    po.innerHTML=`
+      <h1>GAME PAUSED</h1>
+      <div style="display:flex;gap:20px;justify-content:center;margin:4px 0;">
+        <div style="text-align:center;">
+          <div style="font-size:0.5rem;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:3px;">Score</div>
+          <div style="font-family:'Orbitron',sans-serif;font-size:1.3rem;font-weight:900;color:var(--accent);">${state.score}</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:0.5rem;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:3px;">Streak</div>
+          <div style="font-family:'Orbitron',sans-serif;font-size:1.3rem;font-weight:900;color:var(--accent3);">${state.streak}</div>
+        </div>
+        ${state.gameMode==='timer'?`<div style="text-align:center;">
+          <div style="font-size:0.5rem;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:3px;">Time Left</div>
+          <div style="font-family:'Orbitron',sans-serif;font-size:1.3rem;font-weight:900;color:var(--accent2);">${state.timerLeft}s</div>
+        </div>`:''}
+      </div>
+      <div class="go-buttons">
+        <button class="start-btn" onclick="togglePause()">RESUME</button>
+        <button class="ghost-btn" onclick="confirmExitGame()">EXIT MATCH</button>
+      </div>`;
+    po.style.display='flex';
   } else {
     state.running=true;po.style.display='none';pb.textContent='⏸';
     if(state.gameMode==='timer')resumeTimer();
     lastTime=performance.now();requestAnimationFrame(gameLoop);
   }
+}
+
+// Exit confirmation for non-challenge modes — consistent with challenge mode
+function confirmExitGame(){
+  const existing=document.getElementById('ch-exit-confirm');
+  if(existing) existing.remove();
+  const modal=document.createElement('div');
+  modal.id='ch-exit-confirm';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:400;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML=`
+    <div style="background:var(--panel);border:1px solid var(--border2);border-radius:10px;padding:28px 28px;text-align:center;max-width:300px;width:90%;display:flex;flex-direction:column;gap:14px;">
+      <div style="font-family:'Orbitron',sans-serif;font-size:0.85rem;font-weight:900;color:var(--text);letter-spacing:2px;">EXIT MATCH?</div>
+      <div style="font-size:0.72rem;color:var(--text3);line-height:1.7;">Your current progress will be lost.</div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button class="ghost-btn" onclick="document.getElementById('ch-exit-confirm').remove()">CANCEL</button>
+        <button class="start-btn" style="padding:9px 20px;font-size:0.76rem;" onclick="document.getElementById('ch-exit-confirm').remove();exitToHome();">CONFIRM</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
 }
 
 function endGame(){
@@ -1771,20 +1826,39 @@ function endGame(){
   document.getElementById('game-controls').classList.remove('visible');
   document.getElementById('scale-mode-label').style.display='none';
   document.getElementById('stats').style.display='none';
+  document.getElementById('pause-overlay').style.display='none';
   addToLeaderboard(state.score,state.difficulty,state.gameMode,currentUser||'GUEST');
   const newAch=saveGameResult(state.score,state.hits,state.bestStreak,state.difficulty,state.gameMode);
-  const msg=document.getElementById('go-save-msg');
-  if(currentUser){
-    msg.style.color='var(--accent)';
-    msg.textContent=newAch.length>0?`Saved · New: ${ACHIEVEMENTS.find(a=>a.id===newAch[0])?.name}`:'Result saved to your account';
-  } else {
-    msg.style.color='var(--accent3)';
-    msg.textContent='Log in to save your results.';
-  }
-  document.getElementById('final-score').textContent=state.score;
-  document.getElementById('final-hits').textContent=state.hits;
-  document.getElementById('final-streak').textContent=state.bestStreak;
-  document.getElementById('game-over-overlay').style.display='flex';
+  const saveMsg=currentUser
+    ? (newAch.length>0?`New achievement: ${ACHIEVEMENTS.find(a=>a.id===newAch[0])?.name}`:'Result saved.')
+    : 'Log in to save your results.';
+
+  // Consistent game-over screen matching challenge style
+  const goEl=document.getElementById('game-over-overlay');
+  goEl.innerHTML=`
+    <h1>GAME OVER</h1>
+    <div style="font-family:'Orbitron',sans-serif;font-size:3rem;font-weight:900;color:var(--accent);">${state.score}</div>
+    <div style="font-size:0.55rem;color:var(--text3);letter-spacing:3px;text-transform:uppercase;margin-top:-6px;">Final Score</div>
+    <div style="width:100%;max-width:280px;margin-top:4px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px;border-bottom:1px solid var(--border);">
+        <span style="font-size:0.76rem;color:var(--text2);">Notes Hit</span>
+        <span style="font-family:'Orbitron',sans-serif;font-size:0.82rem;color:var(--accent);font-weight:700;">${state.hits}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px;border-bottom:1px solid var(--border);">
+        <span style="font-size:0.76rem;color:var(--text2);">Best Streak</span>
+        <span style="font-family:'Orbitron',sans-serif;font-size:0.82rem;color:var(--accent3);font-weight:700;">${state.bestStreak}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px;border-bottom:1px solid var(--border);">
+        <span style="font-size:0.76rem;color:var(--text2);">Difficulty</span>
+        <span style="font-size:0.78rem;color:var(--text2);font-weight:700;">${state.difficulty.toUpperCase()}</span>
+      </div>
+    </div>
+    <div style="font-size:0.65rem;color:var(--accent);min-height:16px;">${saveMsg}</div>
+    <div class="go-buttons" style="margin-top:4px;">
+      <button class="start-btn" onclick="startGame()">PLAY AGAIN</button>
+      <button class="ghost-btn" onclick="goToMenu()">← BACK TO HOME</button>
+    </div>`;
+  goEl.style.display='flex';
 }
 
 // ─────────────────────────────────────────────
@@ -2328,8 +2402,7 @@ function chStartPlayerScreen(){
   // Same two-button controls as thrower — ⏸ pause + ⏹ exit
   const gc=document.getElementById('game-controls');
   gc.innerHTML=`
-    <button id="pause-btn" style="width:30px;height:30px;border-radius:6px;border:1px solid var(--border2);background:var(--panel);color:var(--text2);font-size:0.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;" onclick="togglePause()">⏸</button>
-    <button id="exit-btn" style="width:30px;height:30px;border-radius:6px;border:1px solid var(--border2);background:var(--panel);color:var(--text2);font-size:0.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;" onclick="chConfirmExit(chEndChallenge)">⏹</button>`;
+    <button id="pause-btn" style="width:30px;height:30px;border-radius:6px;border:1px solid var(--border2);background:var(--panel);color:var(--text2);font-size:0.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;" onclick="togglePause()">⏸</button>`;
   gc.classList.add('visible');
 
   document.getElementById('pause-overlay').innerHTML=`
@@ -2477,8 +2550,7 @@ function chRestoreUI(){
   const tModal = document.getElementById('ch-thrower-pause-modal');
   if(tModal) tModal.style.display='none';
   document.getElementById('game-controls').innerHTML=`
-    <button id="pause-btn" onclick="togglePause()">⏸</button>
-    <button id="exit-btn" onclick="exitToHome()">⏹</button>`;
+    <button id="pause-btn" onclick="togglePause()">⏸</button>`;
   document.getElementById('game-controls').classList.remove('visible');
   document.getElementById('stats').style.display='none';
   document.getElementById('pause-overlay').style.display='none';
