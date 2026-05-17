@@ -4,6 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Note Shooter</title>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+  firebase.initializeApp({
+    apiKey: "AIzaSyCFmozMC3QgKrUaEGF70wmlka7zKwhcc_0",
+    authDomain: "note-shooter.firebaseapp.com",
+    databaseURL: "https://note-shooter-default-rtdb.firebaseio.com",
+    projectId: "note-shooter",
+    storageBucket: "note-shooter.firebasestorage.app",
+    messagingSenderId: "269613522612",
+    appId: "1:269613522612:web:481514400923550497f41e1"
+  });
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Righteous&display=swap" rel="stylesheet">
 <style>
 /* ═══════════════════════════════════════
@@ -1821,7 +1835,7 @@ function endGame(){
   if(state.gameMode==='challenge'){
     // Player ran out of lives — natural game over
     state.running=false; stopMic();
-    clearInterval(ch.pollInterval);
+    chStopListener();
     const myCode=ch.code;
     const room=chRead(myCode);
     if(room){
@@ -1930,15 +1944,36 @@ function chAdjustCooldown(delta){
   if(room){ room.initialCooldownMs = ch.initialCooldownMs; chWrite(ch.code, room); }
 }
 
-// ── Shared "DB" via localStorage ──
+// ── Shared "DB" via Firebase Realtime Database ──
 function chWrite(code, data){
-  localStorage.setItem('ch_room_'+code, JSON.stringify(data));
+  if(!code) return;
+  firebase.database().ref('rooms/'+code).set(data);
 }
 function chRead(code){
-  try{ return JSON.parse(localStorage.getItem('ch_room_'+code)||'null'); }catch{ return null; }
+  // Returns cached value (kept live by chStartListener)
+  if(!code) return null;
+  return ch._cache || null;
 }
 function chClear(code){
-  localStorage.removeItem('ch_room_'+code);
+  if(!code) return;
+  firebase.database().ref('rooms/'+code).remove();
+}
+
+// ── Real-time Firebase listener — replaces setInterval polling ──
+function chStartListener(code, onUpdate){
+  chStopListener();
+  ch._cache=null;
+  ch._onUpdate=onUpdate;
+  ch._ref=firebase.database().ref('rooms/'+code);
+  ch._ref.on('value', snap=>{
+    ch._cache=snap.val();
+    if(ch._onUpdate) ch._onUpdate(ch._cache);
+  });
+}
+function chStopListener(){
+  if(ch._ref){ ch._ref.off(); ch._ref=null; }
+  ch._onUpdate=null;
+  ch._cache=null;
 }
 
 function chGenCode(){
@@ -1997,22 +2032,19 @@ function chCreate(){
   document.getElementById('ch-friend-role-display').textContent='';
   document.getElementById('ch-friend-ready-display').textContent='';
 
-  // Poll for joiner
-  ch.pollInterval = setInterval(()=>{
-    const room = chRead(ch.code);
+  // Listen for joiner via Firebase
+  chStartListener(code, room=>{
     if(!room) return;
     if(room.joiner !== null){
-      clearInterval(ch.pollInterval);
       document.getElementById('ch-waiting-msg').style.display='none';
       document.getElementById('ch-creator-ready-section').style.display='flex';
-      // Now poll for role changes and ready state
-      ch.pollInterval = setInterval(chPollCreator, 400);
+      chPollCreator(room);
     }
-  }, 500);
+  });
 }
 
-function chPollCreator(){
-  const room = chRead(ch.code);
+function chPollCreator(room){
+  if(!room) room=ch._cache;
   if(!room) return;
   const friendRole = room.joiner?.role || null;
   const friendReady = room.joiner?.ready || false;
@@ -2041,7 +2073,7 @@ function chPollCreator(){
   // Start countdown only when both ready AND roles are different
   const myReady = document.getElementById('ch-creator-ready-cb').checked;
   if(myReady && friendReady && ch.myRole && friendRole && ch.myRole !== friendRole){
-    if(!chCountdownInterval){ clearInterval(ch.pollInterval); chStartCountdown(); }
+    if(!chCountdownInterval){ chStopListener(); chStartCountdown(); }
   }
 }
 
@@ -2071,11 +2103,11 @@ function chJoin(){
   document.getElementById('ch-joiner-conflict-msg').textContent='';
   document.getElementById('ch-creator-ready-display').textContent='';
 
-  ch.pollInterval = setInterval(chPollJoiner, 400);
+  chStartListener(ch.code, room=>{ if(room) chPollJoiner(room); });
 }
 
-function chPollJoiner(){
-  const room = chRead(ch.code);
+function chPollJoiner(room){
+  if(!room) room=ch._cache;
   if(!room) return;
   const friendRole = room.creator?.role || null;
   const friendReady = room.creator?.ready || false;
@@ -2101,7 +2133,7 @@ function chPollJoiner(){
 
   const myReady = document.getElementById('ch-joiner-ready-cb').checked;
   if(myReady && friendReady && ch.myRole && friendRole && ch.myRole !== friendRole){
-    if(!chCountdownInterval){ clearInterval(ch.pollInterval); chStartCountdown(); }
+    if(!chCountdownInterval){ chStopListener(); chStartCountdown(); }
   }
 }
 
@@ -2139,8 +2171,7 @@ function chStartCountdown(){
       chClearCountdown();
       chCountdownValue = 0;
       chUpdateCountdownUI();
-      if(ch.role==='creator') ch.pollInterval = setInterval(chPollCreator, 400);
-      else                     ch.pollInterval = setInterval(chPollJoiner,  400);
+      // listener already running — chPollCreator/Joiner will be called on next Firebase update
       return;
     }
     chCountdownValue--;
@@ -2175,8 +2206,7 @@ function chReadyChange(){
     chClearCountdown();
     chCountdownValue = 0;
     chUpdateCountdownUI();
-    if(ch.role==='creator') ch.pollInterval = setInterval(chPollCreator, 400);
-    else                     ch.pollInterval = setInterval(chPollJoiner,  400);
+    // Firebase listener keeps running — no restart needed
   }
 }
 
@@ -2227,13 +2257,12 @@ function chStartThrowerScreen(){
   room.gameState = { notes:[], thrownCount:0, gameOver:false, score:0, paused:false, playerLeft:false, livesLostAt:{} };
   chWrite(ch.code, room);
 
-  ch.pollInterval = setInterval(()=>{
-    const room = chRead(ch.code);
+  chStartListener(ch.code, room=>{
     if(!room?.gameState) return;
 
     // Player voluntarily left — per PDF: show "Opponent Left" with See Statistics / Exit
     if(room.gameState.playerLeft){
-      clearInterval(ch.pollInterval);
+      chStopListener();
       clearTimeout(ch.cooldownTimer);
       document.getElementById('ch-paused-msg-thrower').style.display='none';
       document.querySelectorAll('.ch-note-btn').forEach(b=>b.disabled=true);
@@ -2252,7 +2281,7 @@ function chStartThrowerScreen(){
 
     // Player lost all lives naturally — show opponent lost stats
     if(room.gameState.playerLost){
-      clearInterval(ch.pollInterval);
+      chStopListener();
       clearTimeout(ch.cooldownTimer);
       document.querySelectorAll('.ch-note-btn').forEach(b=>b.disabled=true);
       chShowThrowerStats(room.gameState, 'OPPONENT LOST');
@@ -2291,7 +2320,7 @@ function chStartThrowerScreen(){
         </div>`).join('');
     }
 
-    if(room.gameState.gameOver){ clearInterval(ch.pollInterval); chHandleGameOver(room.gameState); }
+    if(room.gameState.gameOver){ chStopListener(); chHandleGameOver(room.gameState); }
   }, 200);
 }
 
@@ -2430,13 +2459,12 @@ function chStartPlayerScreen(){
   startMic();
   lastTime=performance.now();
 
-  ch.pollInterval = setInterval(()=>{
-    const room = chRead(ch.code);
+  chStartListener(ch.code, room=>{
     if(!room?.gameState) return;
 
     // Thrower left — per PDF: show "Opponent Left" with See Statistics / Exit buttons
     if(room.gameState.throwerLeft){
-      clearInterval(ch.pollInterval);
+      chStopListener();
       state.running=false;
       stopMic();
       const el = document.getElementById('ch-opponent-left-player');
@@ -2508,7 +2536,7 @@ function chStartPlayerScreen(){
 
 // chEndChallenge — voluntary exit (either side)
 function chEndChallenge(){
-  clearInterval(ch.pollInterval);
+  chStopListener();
   clearTimeout(ch.cooldownTimer);
   state.running=false;
   stopMic();
@@ -2643,7 +2671,7 @@ function chConfirmExit(onConfirm){
 }
 
 function chCancel(){
-  clearInterval(ch.pollInterval);
+  chStopListener();
   if(ch.code) chClear(ch.code);
   ch.code=null; ch.role=null; ch.myRole=null;
   switchToMode('classic');
