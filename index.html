@@ -1827,10 +1827,10 @@ function endGame(){
   if(state.gameMode==='challenge'){
     state.running=false; stopMic();
     const myCode=ch.code;
-    // Write directly to Firebase — no chRead needed
+    console.log('[CH-PLAYER] endGame firing, code:', myCode);
     firebase.database().ref('rooms/'+myCode+'/gameState/gameOver').set(true);
     firebase.database().ref('rooms/'+myCode+'/gameState/playerLost').set(true);
-    // Stop listener after writing
+    console.log('[CH-PLAYER] playerLost written to Firebase');
     chStopListener();
     setTimeout(()=>chClear(myCode),4000);
     ch.code=null; ch.myRole=null;
@@ -2314,6 +2314,7 @@ function chStartThrowerScreen(){
     }
 
     // Player lost all lives naturally — show opponent lost stats
+    console.log('[CH-THROWER] gameState:', JSON.stringify(room.gameState));
     if(room.gameState.playerLost){
       chStopListener();
       clearTimeout(ch.cooldownTimer);
