@@ -1788,7 +1788,7 @@ function togglePause(){
       </div>
       <div class="go-buttons">
         <button class="start-btn" onclick="togglePause()">RESUME</button>
-        <button class="ghost-btn" onclick="confirmExitGame()">EXIT MATCH</button>
+        <button class="ghost-btn" onclick="state.gameMode==='challenge'?chConfirmExit(chEndChallenge):confirmExitGame()">EXIT MATCH</button>
       </div>`;
     po.style.display='flex';
   } else {
@@ -2507,27 +2507,31 @@ function chStartPlayerScreen(){
 }
 
 // chEndChallenge — voluntary exit (either side)
-// Per PDF: exiting player goes straight to home; other player sees "Opponent Left" popup
 function chEndChallenge(){
   clearInterval(ch.pollInterval);
   clearTimeout(ch.cooldownTimer);
   state.running=false;
   stopMic();
 
-  // Flag who left — keep room alive for 4s so other tab's poll can read it
-  const room = chRead(ch.code);
   const myCode = ch.code;
   const myRole = ch.myRole;
-  if(room){
+
+  // Write the left flag — do it twice 100ms apart to ensure it lands
+  function writeLeftFlag(){
+    const room = chRead(myCode) || {creator:{role:null,ready:false},joiner:null};
     if(!room.gameState) room.gameState={notes:[],thrownCount:0,gameOver:false,score:0,paused:false,playerLeft:false,throwerLeft:false,livesLostAt:{}};
     if(myRole==='player') room.gameState.playerLeft=true;
     else room.gameState.throwerLeft=true;
     room.gameState.gameOver=true;
     chWrite(myCode, room);
   }
-  setTimeout(()=>chClear(myCode), 4000);
+  writeLeftFlag();
+  setTimeout(writeLeftFlag, 100); // second write for safety
+  setTimeout(writeLeftFlag, 400); // third write for safety
+  // Clear room after 6s — enough time for other tab's poll (runs every 150ms) to catch it
+  setTimeout(()=>chClear(myCode), 6000);
 
-  // Per PDF: the exiting player goes directly to home, no stats shown
+  // Per PDF: exiting player goes directly to home
   ch.code=null; ch.role=null; ch.myRole=null;
   chRestoreUI();
   goToMenu();
