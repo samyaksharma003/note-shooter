@@ -2076,7 +2076,7 @@ function chPollCreator(room){
   // Start countdown only when both ready AND roles are different
   const myReady = document.getElementById('ch-creator-ready-cb').checked;
   if(myReady && friendReady && ch.myRole && friendRole && ch.myRole !== friendRole){
-    if(!chCountdownInterval){ chStopListener(); chStartCountdown(); }
+    if(!chCountdownInterval){ chStartCountdown(); }
   }
 }
 
@@ -2146,7 +2146,7 @@ function chPollJoiner(room){
 
   const myReady = document.getElementById('ch-joiner-ready-cb').checked;
   if(myReady && friendReady && ch.myRole && friendRole && ch.myRole !== friendRole){
-    if(!chCountdownInterval){ chStopListener(); chStartCountdown(); }
+    if(!chCountdownInterval){ chStartCountdown(); }
   }
 }
 
@@ -2205,29 +2205,22 @@ function chStartCountdown(){
     }, 1000);
 
   } else {
-    // Joiner watches the countdown value in Firebase
-    // chStartListener is already running — chPollJoiner handles ready state
-    // We just watch for the start signal and countdown value via the existing listener
-    // The listener calls chPollJoiner which calls chStartCountdown — 
-    // but we need to watch 'start' and 'countdown' fields
-    const watchRef = firebase.database().ref('rooms/'+ch.code);
-    watchRef.on('value', snap=>{
-      const room = snap.val();
+    // Joiner — existing Firebase listener (chStartListener) keeps ch._cache live.
+    // We just watch for start signal via a direct once() poll every second
+    chCountdownInterval = setInterval(()=>{
+      const room = ch._cache;
       if(!room) return;
-      // Sync countdown display
-      if(typeof room.countdown === 'number' && room.countdown > 0){
+      // Sync countdown display from Firebase value
+      if(typeof room.countdown === 'number'){
         chCountdownValue = room.countdown;
-        chUpdateCountdownUI();
-      } else if(room.countdown === 0 && chCountdownValue > 0){
-        chCountdownValue = 0;
         chUpdateCountdownUI();
       }
       // Start game when creator signals
       if(room.start === true){
-        watchRef.off();
+        chClearCountdown();
         chStartGame();
       }
-    });
+    }, 500); // poll every 500ms for snappy response
   }
 }
 
