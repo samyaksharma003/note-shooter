@@ -1,0 +1,2637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Note Shooter</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Righteous&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════
+   THEME VARIABLES
+   base: dark / light
+   accent: blue / pink
+═══════════════════════════════════════ */
+body.dark {
+  --bg:#202020; --bg2:#2a2a2a; --panel:#282828; --panel2:#323232;
+  --border:#3c3c3c; --border2:#505050;
+  --text:#eeeeee; --text2:#aaaaaa; --text3:#666666;
+  --accent2:#ff5566; --accent3:#f0b429;
+  --overlay:rgba(22,22,22,0.97); --fret1:#2a1a08; --fret2:#1a0e04;
+}
+body.light {
+  --bg:#f4f4f4; --bg2:#e8e8e8; --panel:#ffffff; --panel2:#f0f0f0;
+  --border:#d8d8d8; --border2:#bbbbbb;
+  --text:#111111; --text2:#444444; --text3:#888888;
+  --accent2:#cc2233; --accent3:#8a5c00;
+  --overlay:rgba(244,244,244,0.98); --fret1:#2a1a08; --fret2:#1a0e04;
+}
+/* accent: blue */
+body.acc-blue { --accent:#4a9eff; --accent-dim:rgba(74,158,255,0.1); }
+/* accent: pink */
+body.acc-pink { --accent:#e870a0; --accent-dim:rgba(232,112,160,0.1); }
+
+/* ═══════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════ */
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  background:var(--bg); color:var(--text);
+  font-family:'Share Tech Mono',monospace;
+  height:100vh; overflow:hidden;
+  transition:background 0.25s, color 0.25s;
+}
+
+/* ═══════════════════════════════════════
+   LAYOUT — sidebar + main
+═══════════════════════════════════════ */
+#app { display:flex; height:100vh; }
+
+/* ── SIDEBAR ── */
+#sidebar {
+  width:0; overflow:hidden;
+  background:var(--panel); border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  transition:width 0.25s ease; flex-shrink:0; z-index:100;
+}
+#sidebar.open { width:260px; }
+#sidebar-inner { width:260px; display:flex; flex-direction:column; height:100%; }
+
+#sidebar-header {
+  padding:18px 20px 14px;
+  border-bottom:1px solid var(--border);
+  display:flex; flex-direction:column; gap:4px;
+}
+#sidebar-app-name {
+  font-family:'Orbitron',sans-serif; font-size:0.78rem;
+  font-weight:900; color:var(--accent); letter-spacing:3px;
+}
+#sidebar-user-info { font-size:0.68rem; color:var(--text3); }
+
+#sidebar-nav { flex:1; padding:12px 0; overflow-y:auto; }
+
+.nav-item {
+  display:flex; align-items:center; gap:12px;
+  padding:11px 20px; cursor:pointer;
+  font-size:0.75rem; color:var(--text2);
+  border-left:2px solid transparent;
+  transition:all 0.15s;
+}
+.nav-item:hover { background:var(--panel2); color:var(--text); }
+.nav-item.active { color:var(--accent); border-left-color:var(--accent); background:var(--accent-dim); }
+.nav-icon { font-size:0.9rem; width:18px; text-align:center; opacity:0.7; }
+
+#sidebar-footer {
+  padding:14px 20px;
+  border-top:1px solid var(--border);
+  font-size:0.62rem; color:var(--text3);
+}
+#sidebar-close {
+  width:24px; height:24px; border-radius:4px;
+  border:1px solid var(--border2); background:transparent;
+  color:var(--text3); font-size:0.75rem; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.15s; flex-shrink:0;
+}
+#sidebar-close:hover { border-color:var(--accent2); color:var(--accent2); }
+
+/* ── SIDEBAR OVERLAY PANEL (slides in from left over game) ── */
+#sidebar-panel {
+  position:fixed; top:0; left:260px; bottom:0;
+  width:380px; max-width:calc(100vw - 260px);
+  background:var(--panel); border-right:1px solid var(--border);
+  z-index:99; display:none; flex-direction:column;
+  overflow-y:auto;
+}
+#sidebar-panel.open { display:flex; }
+#sidebar-panel-inner { padding:24px 24px 40px; display:flex; flex-direction:column; gap:20px; }
+
+.sp-title {
+  font-family:'Orbitron',sans-serif; font-size:0.85rem;
+  font-weight:900; color:var(--text); letter-spacing:3px;
+  border-bottom:1px solid var(--border); padding-bottom:14px;
+}
+.sp-section { display:flex; flex-direction:column; gap:10px; }
+.sp-section-label { font-size:0.52rem; color:var(--text3); letter-spacing:3px; text-transform:uppercase; }
+
+/* ── MAIN CONTENT ── */
+#main { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+
+/* ═══════════════════════════════════════
+   HEADER
+═══════════════════════════════════════ */
+#header {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:0 20px; height:52px; background:var(--panel);
+  border-bottom:1px solid var(--border); flex-shrink:0; z-index:10;
+}
+#hamburger {
+  width:32px; height:32px; background:transparent;
+  border:1px solid var(--border2); border-radius:6px;
+  color:var(--text2); cursor:pointer; font-size:1rem;
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.15s; flex-shrink:0;
+}
+#hamburger:hover { border-color:var(--accent); color:var(--accent); }
+#title { font-family:'Orbitron',sans-serif; font-size:0.9rem; font-weight:900; color:var(--accent); letter-spacing:4px; }
+#header-right { display:flex; align-items:center; gap:18px; }
+#stats { display:flex; gap:20px; }
+.stat-block { text-align:center; }
+.stat-label { color:var(--text3); font-size:0.5rem; letter-spacing:2px; text-transform:uppercase; display:block; margin-bottom:2px; }
+.stat-value { color:var(--text); font-size:0.85rem; font-weight:bold; }
+
+/* ═══════════════════════════════════════
+   GAME AREA
+═══════════════════════════════════════ */
+#game-area { flex:1; position:relative; overflow:hidden; }
+canvas#gameCanvas { position:absolute; top:0; left:0; width:100%; height:100%; }
+
+#mic-bar { position:absolute; top:12px; right:14px; display:flex; align-items:center; gap:6px; font-size:0.6rem; color:var(--text3); z-index:20; }
+#mic-dot { width:6px; height:6px; border-radius:50%; background:var(--text3); transition:background 0.2s; }
+#mic-dot.active { background:var(--accent); }
+#detected-note { position:absolute; top:8px; left:14px; font-family:'Righteous',sans-serif; font-size:1.7rem; color:var(--accent3); z-index:20; }
+#timer-display { position:absolute; top:50px; left:50%; transform:translateX(-50%); font-family:'Orbitron',sans-serif; font-size:1.3rem; color:var(--accent3); z-index:20; display:none; letter-spacing:4px; font-weight:700; }
+#practice-label { position:absolute; top:10px; left:50%; transform:translateX(-50%); font-size:0.58rem; color:var(--text3); letter-spacing:3px; z-index:20; display:none; text-transform:uppercase; }
+#scale-mode-label { position:absolute; top:10px; left:50%; transform:translateX(-50%); font-size:0.58rem; color:var(--text2); z-index:20; display:none; background:var(--panel); border:1px solid var(--border); border-radius:20px; padding:3px 12px; white-space:nowrap; }
+#combo-display { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-family:'Orbitron',sans-serif; font-size:1.4rem; color:var(--accent3); pointer-events:none; z-index:30; opacity:0; transition:opacity 0.3s; font-weight:700; }
+
+/* in-game controls */
+#game-controls { position:absolute; top:11px; right:100px; display:none; gap:6px; z-index:25; }
+#game-controls.visible { display:flex; }
+#pause-btn,#exit-btn { width:30px; height:30px; border-radius:6px; border:1px solid var(--border2); background:var(--panel); color:var(--text2); font-size:0.8rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; }
+#pause-btn:hover { border-color:var(--accent3); color:var(--accent3); }
+#exit-btn:hover { border-color:var(--accent2); color:var(--accent2); }
+
+/* ═══════════════════════════════════════
+   FRETBOARD
+═══════════════════════════════════════ */
+#fretboard-display { position:absolute; bottom:0; left:0; right:0; height:110px; background:linear-gradient(to bottom,var(--fret1),var(--fret2)); border-top:1px solid #5a3a1a; z-index:15; overflow:hidden; }
+#fretboard-display canvas { width:100%; height:100%; }
+
+/* ═══════════════════════════════════════
+   OVERLAYS
+═══════════════════════════════════════ */
+.overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:var(--overlay); z-index:50; gap:14px; overflow-y:auto; padding:20px; }
+.overlay h1 { font-family:'Orbitron',sans-serif; font-size:clamp(1rem,2.5vw,1.7rem); color:var(--text); letter-spacing:5px; text-align:center; font-weight:900; }
+.overlay > p { color:var(--text3); font-size:0.76rem; text-align:center; max-width:360px; line-height:1.8; }
+.overlay p span { color:var(--accent); }
+.section-label { font-size:0.5rem; color:var(--text3); letter-spacing:3px; text-transform:uppercase; align-self:center; margin-top:2px; }
+
+/* mode buttons — dominant, card-style */
+.mode-row { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+.mode-btn {
+  padding:12px 22px; border:1px solid var(--border2);
+  background:var(--panel2); color:var(--text);
+  font-family:'Orbitron',sans-serif; font-size:0.72rem; font-weight:700;
+  letter-spacing:2px; cursor:pointer; border-radius:8px;
+  transition:all 0.15s; min-width:110px; text-align:center;
+}
+.mode-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+.mode-btn.selected {
+  border-color:var(--accent); color:var(--accent);
+  background:var(--accent-dim); box-shadow:0 0 0 1px var(--accent);
+}
+
+/* difficulty — smaller, secondary */
+#difficulty-selector { display:flex; gap:5px; flex-wrap:wrap; justify-content:center; }
+.diff-btn {
+  padding:6px 12px; border:1px solid var(--border);
+  background:transparent; color:var(--text3);
+  font-family:'Share Tech Mono',monospace;
+  cursor:pointer; border-radius:6px; transition:all 0.15s;
+  display:flex; flex-direction:column; align-items:center; gap:2px; min-width:80px;
+}
+.diff-btn .diff-name { color:var(--text2); font-size:0.64rem; font-weight:bold; }
+.diff-btn .diff-desc { font-size:0.52rem; color:var(--text3); }
+.diff-btn:hover { border-color:var(--border2); }
+.diff-btn.selected { border-color:var(--accent); background:var(--accent-dim); }
+.diff-btn.selected .diff-name { color:var(--accent); }
+
+/* buttons */
+.start-btn { padding:11px 36px; background:var(--accent); color:#fff; border:none; font-family:'Orbitron',sans-serif; font-size:0.8rem; font-weight:700; letter-spacing:3px; cursor:pointer; border-radius:6px; transition:all 0.15s; }
+.start-btn:hover { filter:brightness(1.1); transform:translateY(-1px); }
+.ghost-btn { padding:9px 20px; background:transparent; border:1px solid var(--border2); color:var(--text2); font-family:'Share Tech Mono',monospace; font-size:0.66rem; letter-spacing:1px; cursor:pointer; border-radius:6px; transition:all 0.15s; }
+.ghost-btn:hover { border-color:var(--text2); color:var(--text); }
+
+/* game over */
+#game-over-overlay .big-score { font-family:'Orbitron',sans-serif; font-size:clamp(2.5rem,8vw,5rem); color:var(--accent); font-weight:900; }
+.go-buttons { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+
+/* lives */
+#lives-display { display:flex; gap:3px; align-items:center; }
+.life-icon { font-size:0.85rem; }
+.life-icon.lost { opacity:0.15; }
+
+/* ═══════════════════════════════════════
+   LEADERBOARD
+═══════════════════════════════════════ */
+#leaderboard-box { width:100%; max-width:360px; }
+#leaderboard-box h3 { font-size:0.52rem; color:var(--text3); letter-spacing:3px; text-transform:uppercase; margin-bottom:8px; text-align:center; }
+.lb-row { display:flex; justify-content:space-between; align-items:center; padding:7px 4px; border-bottom:1px solid var(--border); }
+.lb-row:last-child { border-bottom:none; }
+.lb-rank { font-size:0.7rem; color:var(--text3); width:24px; }
+.lb-rank.gold{color:#c8960c;} .lb-rank.silver{color:#909090;} .lb-rank.bronze{color:#a07040;}
+.lb-name { flex:1; font-size:0.7rem; color:var(--text); }
+.lb-diff { font-size:0.55rem; color:var(--text3); margin-right:8px; }
+.lb-score { font-family:'Orbitron',sans-serif; font-size:0.8rem; color:var(--accent); font-weight:700; }
+.lb-empty { color:var(--text3); font-size:0.7rem; text-align:center; padding:14px 0; }
+
+/* ═══════════════════════════════════════
+   SCALE PICKER
+═══════════════════════════════════════ */
+.root-btn,.scale-type-btn { padding:5px 10px; border:1px solid var(--border); background:transparent; color:var(--text2); font-family:'Share Tech Mono',monospace; font-size:0.68rem; cursor:pointer; border-radius:4px; transition:all 0.15s; }
+.root-btn:hover,.root-btn.selected { border-color:var(--accent3); color:var(--accent3); background:var(--accent-dim); }
+.scale-type-btn { font-size:0.62rem; }
+.scale-type-btn:hover,.scale-type-btn.selected { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+
+/* ═══════════════════════════════════════
+   PRACTICE PANEL
+═══════════════════════════════════════ */
+#practice-panel { position:absolute; inset:0; z-index:40; display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px; background:var(--overlay); }
+#practice-panel.active { display:flex; }
+#practice-note-display { font-family:'Orbitron',sans-serif; font-size:5rem; font-weight:900; color:var(--accent); letter-spacing:6px; }
+#practice-hint { font-size:0.74rem; color:var(--text3); text-align:center; max-width:300px; line-height:1.8; }
+#practice-status { font-family:'Righteous',sans-serif; font-size:1.1rem; min-height:32px; color:var(--accent); }
+#practice-nav { display:flex; gap:8px; }
+
+/* ═══════════════════════════════════════
+   SIDEBAR PANEL COMPONENTS
+═══════════════════════════════════════ */
+/* toggle */
+.toggle { width:34px; height:18px; background:var(--panel2); border:1px solid var(--border2); border-radius:9px; position:relative; cursor:pointer; transition:border-color 0.2s; flex-shrink:0; }
+.toggle.on { border-color:var(--accent); }
+.toggle::after { content:''; position:absolute; width:12px; height:12px; background:var(--text3); border-radius:50%; top:2px; left:2px; transition:all 0.2s; }
+.toggle.on::after { left:18px; background:var(--accent); }
+
+.toggle-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); }
+.toggle-row:last-child { border-bottom:none; }
+.toggle-label { font-size:0.72rem; color:var(--text2); }
+.toggle-desc { font-size:0.58rem; color:var(--text3); margin-top:2px; }
+
+/* theme selector in sidebar */
+.theme-base-row { display:flex; gap:6px; }
+.theme-base-btn { flex:1; padding:8px; border:1px solid var(--border); background:transparent; color:var(--text2); font-family:'Share Tech Mono',monospace; font-size:0.66rem; cursor:pointer; border-radius:6px; transition:all 0.15s; text-align:center; }
+.theme-base-btn:hover { border-color:var(--border2); color:var(--text); }
+.theme-base-btn.selected { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+
+.accent-row { display:flex; gap:6px; }
+.accent-btn { flex:1; padding:8px 4px; border:2px solid transparent; border-radius:6px; cursor:pointer; font-family:'Share Tech Mono',monospace; font-size:0.62rem; text-align:center; transition:all 0.15s; display:flex; align-items:center; justify-content:center; gap:6px; }
+.accent-btn .swatch { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+.accent-btn[data-acc="blue"] .swatch { background:#4a9eff; }
+.accent-btn[data-acc="pink"] .swatch { background:#e870a0; }
+.accent-btn { border:1px solid var(--border); color:var(--text2); background:transparent; }
+.accent-btn:hover { border-color:var(--border2); color:var(--text); }
+.accent-btn.selected { border-color:var(--accent); background:var(--accent-dim); color:var(--accent); }
+
+/* account in sidebar */
+.sb-auth-input { width:100%; padding:9px 12px; background:var(--panel2); border:1px solid var(--border2); border-radius:6px; color:var(--text); font-family:'Share Tech Mono',monospace; font-size:0.8rem; outline:none; transition:border-color 0.15s; margin-bottom:8px; }
+.sb-auth-input:focus { border-color:var(--accent); }
+.sb-auth-input::placeholder { color:var(--text3); }
+.sb-btn { padding:8px 20px; background:var(--accent); color:#fff; border:none; font-family:'Share Tech Mono',monospace; font-size:0.72rem; cursor:pointer; border-radius:6px; transition:all 0.15s; }
+.sb-btn:hover { filter:brightness(1.1); }
+.sb-btn.outline { background:transparent; border:1px solid var(--accent); color:var(--accent); }
+.sb-btn.outline:hover { background:var(--accent-dim); }
+.sb-btn.danger { background:transparent; border:1px solid var(--accent2); color:var(--accent2); }
+.sb-btn.danger:hover { background:rgba(204,34,51,0.08); }
+.auth-msg { font-size:0.68rem; min-height:16px; margin-bottom:6px; }
+.auth-msg.error { color:var(--accent2); }
+.auth-msg.success { color:var(--accent); }
+
+/* profile card in sidebar */
+.sb-profile-name { font-family:'Orbitron',sans-serif; font-size:1rem; color:var(--text); font-weight:900; letter-spacing:2px; margin-bottom:4px; }
+.sb-profile-email { font-size:0.65rem; color:var(--text3); margin-bottom:14px; }
+.sb-stat-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; margin-bottom:14px; }
+.sb-stat-box { background:var(--panel2); border:1px solid var(--border); border-radius:6px; padding:10px; text-align:center; }
+.sb-stat-box .ps-label { font-size:0.5rem; color:var(--text3); letter-spacing:2px; text-transform:uppercase; display:block; margin-bottom:3px; }
+.sb-stat-box .ps-value { font-family:'Orbitron',sans-serif; font-size:0.9rem; color:var(--accent); font-weight:700; }
+
+/* dashboard in sidebar */
+.sb-history-item { padding:9px 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.sb-history-item:first-child { border-top:1px solid var(--border); }
+.hi-left { display:flex; flex-direction:column; gap:2px; }
+.hi-diff { font-size:0.62rem; font-weight:bold; letter-spacing:1px; }
+.hi-diff.beginner{color:var(--accent);}
+.hi-diff.intermediate{color:#4a9eff;}
+.hi-diff.pro{color:var(--accent3);}
+.hi-diff.shredder{color:var(--accent2);}
+.hi-date { font-size:0.56rem; color:var(--text3); }
+.hi-right { text-align:right; }
+.hi-score { font-family:'Orbitron',sans-serif; font-size:0.88rem; color:var(--text); font-weight:700; }
+.hi-meta { font-size:0.56rem; color:var(--text3); }
+
+/* achievements in sidebar */
+.ach-list { display:flex; flex-direction:column; gap:0; }
+.ach-item { display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid var(--border); }
+.ach-item:first-child { border-top:1px solid var(--border); }
+.ach-item-icon { font-size:1.3rem; width:28px; text-align:center; flex-shrink:0; }
+.ach-item.locked .ach-item-icon { filter:grayscale(1); opacity:0.25; }
+.ach-item-body { flex:1; }
+.ach-item-name { font-size:0.66rem; color:var(--text); font-weight:bold; text-transform:uppercase; letter-spacing:1px; }
+.ach-item.locked .ach-item-name { color:var(--text3); }
+.ach-item-desc { font-size:0.58rem; color:var(--text3); margin-top:1px; }
+.ach-item-badge { font-size:0.5rem; padding:2px 7px; border-radius:10px; flex-shrink:0; }
+.ach-item.unlocked .ach-item-badge { color:var(--accent); border:1px solid var(--accent); }
+.ach-item.locked .ach-item-badge { color:var(--text3); border:1px solid var(--border2); }
+
+.not-logged-msg { color:var(--text3); text-align:center; padding:30px 0; font-size:0.76rem; line-height:1.8; }
+
+/* sub-tabs inside sidebar panel */
+.sb-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:16px; }
+.sb-tab { padding:7px 14px; background:transparent; border:none; color:var(--text3); font-family:'Share Tech Mono',monospace; font-size:0.62rem; letter-spacing:1px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all 0.15s; }
+.sb-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.sb-sub { display:none; }
+.sb-sub.active { display:block; }
+
+/* help accordion */
+.help-item { border-bottom:1px solid var(--border); }
+.help-item:first-child { border-top:1px solid var(--border); }
+.help-q {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:11px 0; cursor:pointer; font-size:0.72rem; color:var(--text2);
+  user-select:none; transition:color 0.15s;
+}
+.help-q:hover { color:var(--text); }
+.help-q.open { color:var(--accent); }
+.help-arrow { font-size:1rem; color:var(--text3); transition:transform 0.2s; }
+.help-q.open .help-arrow { transform:rotate(90deg); color:var(--accent); }
+.help-a {
+  font-size:0.68rem; color:var(--text3); line-height:1.8;
+  padding:0 0 12px 0; display:none;
+}
+.help-a.open { display:block; }
+
+/* dropdown */
+.sb-select { width:100%; padding:8px 10px; background:var(--panel2); border:1px solid var(--border2); border-radius:6px; color:var(--text); font-family:'Share Tech Mono',monospace; font-size:0.72rem; cursor:pointer; outline:none; }
+
+/* ═══════════════════════════════════════
+   CHALLENGE MODE
+═══════════════════════════════════════ */
+.ch-role-row {
+  display:flex; gap:10px; width:100%; max-width:380px;
+}
+.ch-role-btn {
+  flex:1; padding:14px 10px;
+  border:1px solid var(--border2); background:var(--panel2);
+  color:var(--text2); font-family:'Orbitron',sans-serif;
+  font-size:0.62rem; font-weight:700; letter-spacing:1px;
+  cursor:pointer; border-radius:8px; transition:all 0.15s;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  text-align:center;
+}
+.ch-role-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+.ch-role-btn.selected { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); box-shadow:0 0 0 1px var(--accent); }
+.ch-role-btn.conflict { border-color:var(--accent2); color:var(--accent2); background:rgba(204,34,51,0.06); }
+.ch-role-desc { font-family:'Share Tech Mono',monospace; font-size:0.56rem; color:var(--text3); font-weight:normal; letter-spacing:0; }
+.ch-role-btn.selected .ch-role-desc { color:var(--accent); opacity:0.7; }
+
+.ch-ready-label {
+  display:flex; align-items:center; gap:10px;
+  font-size:0.72rem; color:var(--text2); cursor:pointer;
+  padding:10px 18px; border:1px solid var(--border2);
+  border-radius:6px; transition:all 0.15s;
+}
+.ch-ready-label input[type="checkbox"] {
+  width:16px; height:16px; accent-color:var(--accent); cursor:pointer;
+}
+.ch-ready-label input:disabled { opacity:0.3; cursor:not-allowed; }
+.ch-ready-label:has(input:checked) { border-color:var(--accent); color:var(--accent); }
+
+/* note throw buttons */
+.ch-centre-msg {
+  display:none;
+  position:absolute;
+  top:50%; left:50%; transform:translate(-50%,-50%);
+  background:var(--panel);
+  border:1px solid var(--border2);
+  border-radius:10px;
+  padding:20px 36px;
+  font-family:'Orbitron',sans-serif;
+  font-size:0.9rem; font-weight:700;
+  letter-spacing:2px; text-align:center;
+  z-index:60; line-height:1.8;
+}
+.ch-centre-msg.paused  { border-color:var(--accent3); color:var(--accent3); }
+.ch-centre-msg.left    { border-color:var(--accent2); color:var(--accent2); }
+
+/* note throw buttons */
+.ch-note-btn {
+  width:58px; height:58px; border-radius:8px;
+  border:1px solid var(--border2); background:var(--panel2);
+  color:var(--text); font-family:'Righteous',sans-serif;
+  font-size:1rem; cursor:pointer; transition:all 0.12s;
+  display:flex; align-items:center; justify-content:center;
+  position:relative;
+}
+.ch-note-btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); transform:translateY(-2px); }
+.ch-note-btn:active:not(:disabled) { transform:scale(0.94); }
+.ch-note-btn:disabled { opacity:0.3; cursor:not-allowed; transform:none; }
+.ch-note-btn.just-thrown { border-color:var(--accent); background:var(--accent-dim); color:var(--accent); }
+</style>
+</head>
+<body class="dark acc-blue">
+<div id="app">
+
+  <!-- ══════════════════════════════
+       SIDEBAR
+  ══════════════════════════════ -->
+  <div id="sidebar">
+    <div id="sidebar-inner">
+      <div id="sidebar-header">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <div id="sidebar-app-name">NOTE SHOOTER</div>
+          <button id="sidebar-close" onclick="toggleSidebar()">✕</button>
+        </div>
+        <div id="sidebar-user-info">Not logged in</div>
+      </div>
+      <nav id="sidebar-nav">
+        <div class="nav-item" data-panel="account" onclick="openPanel('account')">
+          <span class="nav-icon">◉</span> Account
+        </div>
+        <div class="nav-item" data-panel="dashboard" onclick="openPanel('dashboard')">
+          <span class="nav-icon">▦</span> Dashboard
+        </div>
+        <div class="nav-item" data-panel="settings" onclick="openPanel('settings')">
+          <span class="nav-icon">◈</span> Settings
+        </div>
+        <div class="nav-item" data-panel="help" onclick="openPanel('help')">
+          <span class="nav-icon">?</span> Help
+        </div>
+      </nav>
+      <div id="sidebar-footer">v1.0 · Local storage</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════
+       SIDEBAR PANEL (slides next to sidebar)
+  ══════════════════════════════ -->
+  <div id="sidebar-panel">
+    <div id="sidebar-panel-inner">
+
+      <!-- ACCOUNT PANEL -->
+      <div id="panel-account" class="sp-content" style="display:none;">
+        <div class="sp-title">ACCOUNT</div>
+
+        <!-- not logged in -->
+        <div id="sb-auth-section">
+          <input class="sb-auth-input" type="text" id="sb-username" placeholder="Username" maxlength="20" autocomplete="off"/>
+          <input class="sb-auth-input" type="password" id="sb-password" placeholder="Password" maxlength="40"/>
+          <div class="auth-msg" id="sb-auth-msg"></div>
+          <div style="display:flex;gap:8px;">
+            <button class="sb-btn" onclick="sbLogin()">LOGIN</button>
+            <button class="sb-btn outline" onclick="sbSignup()">SIGN UP</button>
+          </div>
+          <p style="font-size:0.62rem;color:var(--text3);margin-top:10px;line-height:1.7;">Accounts are stored locally on this browser.</p>
+        </div>
+
+        <!-- logged in -->
+        <div id="sb-profile-section" style="display:none;">
+          <div class="sb-profile-name" id="sb-profile-name"></div>
+          <div class="sb-profile-email" id="sb-profile-joined"></div>
+          <div class="sb-stat-grid">
+            <div class="sb-stat-box"><span class="ps-label">Games</span><div class="ps-value" id="sb-stat-games">0</div></div>
+            <div class="sb-stat-box"><span class="ps-label">Best Score</span><div class="ps-value" id="sb-stat-best">0</div></div>
+            <div class="sb-stat-box"><span class="ps-label">Best Streak</span><div class="ps-value" id="sb-stat-streak">0</div></div>
+            <div class="sb-stat-box"><span class="ps-label">Total Hits</span><div class="ps-value" id="sb-stat-hits">0</div></div>
+          </div>
+          <button class="sb-btn danger" onclick="sbLogout()">LOGOUT</button>
+        </div>
+      </div>
+
+      <!-- DASHBOARD PANEL -->
+      <div id="panel-dashboard" class="sp-content" style="display:none;">
+        <div class="sp-title">DASHBOARD</div>
+
+        <div class="sb-tabs">
+          <button class="sb-tab active" onclick="switchSbTab('history')">History</button>
+          <button class="sb-tab" onclick="switchSbTab('achievements')">Achievements</button>
+        </div>
+
+        <div class="sb-sub active" id="sb-sub-history">
+          <div id="sb-history-content"></div>
+        </div>
+        <div class="sb-sub" id="sb-sub-achievements">
+          <div class="ach-list" id="sb-ach-list"></div>
+        </div>
+      </div>
+
+      <!-- SETTINGS PANEL -->
+      <div id="panel-settings" class="sp-content" style="display:none;">
+        <div class="sp-title">SETTINGS</div>
+
+        <!-- Display -->
+        <div class="sp-section">
+          <div class="sp-section-label">Display</div>
+
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Base Theme</div>
+            </div>
+            <div class="theme-base-row">
+              <button class="theme-base-btn selected" data-base="dark" onclick="setBase('dark')">Dark</button>
+              <button class="theme-base-btn" data-base="light" onclick="setBase('light')">Light</button>
+            </div>
+          </div>
+
+          <div class="toggle-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
+            <div class="toggle-label">Accent Colour</div>
+            <div class="accent-row" style="width:100%;">
+              <button class="accent-btn selected" data-acc="blue" onclick="setAccent('blue')">
+                <span class="swatch"></span> Arctic Blue
+              </button>
+              <button class="accent-btn" data-acc="pink" onclick="setAccent('pink')">
+                <span class="swatch"></span> Baby Pink
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Game Settings -->
+        <div class="sp-section">
+          <div class="sp-section-label">Game</div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Sharp Notes</div>
+              <div class="toggle-desc">Include F#, G#, A# etc.</div>
+            </div>
+            <div class="toggle" id="sharps-toggle" onclick="toggleSharps()"></div>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Octave Mode</div>
+              <div class="toggle-desc">Show C3, C4 etc.</div>
+            </div>
+            <div class="toggle" id="octave-toggle" onclick="toggleOctave()"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HELP PANEL -->
+      <div id="panel-help" class="sp-content" style="display:none;">
+        <div class="sp-title">HELP</div>
+
+        <div class="sp-section">
+          <div class="sp-section-label">Game Modes</div>
+          <div class="help-item">
+            <div class="help-q" onclick="toggleHelp(this)"><span>Classic</span><span class="help-arrow">›</span></div>
+            <div class="help-a">Notes fall from the top. Play the correct note before it hits the bottom. You have 3 lives — miss 3 and it's game over. Score and speed increase as you hit more notes. Extra lives are earned at streaks of 50, 150 and 300.</div>
+          </div>
+          <div class="help-item">
+            <div class="help-q" onclick="toggleHelp(this)"><span>60s Timer</span><span class="help-arrow">›</span></div>
+            <div class="help-a">Same as Classic but with a 60-second countdown instead of lives. Score as many points as you can before time runs out. Great for quick sessions and leaderboard runs. Completing it unlocks the Speed Run achievement.</div>
+          </div>
+          <div class="help-item">
+            <div class="help-q" onclick="toggleHelp(this)"><span>Scale</span><span class="help-arrow">›</span></div>
+            <div class="help-a">Pick a root note and a scale type — only notes from that scale will fall. This trains you to internalize which notes belong together. Your fingers and ears will start recognizing scale patterns naturally through repetition.</div>
+          </div>
+          <div class="help-item">
+            <div class="help-q" onclick="toggleHelp(this)"><span>Practice</span><span class="help-arrow">›</span></div>
+            <div class="help-a">No falling notes, no pressure. A note name appears on screen — find it on your fretboard and play it. The fretboard below lights up all matching positions when you play correctly. The best way to build your fretboard map from scratch.</div>
+          </div>
+        </div>
+
+        <div class="sp-section">
+          <div class="sp-section-label">Difficulty Levels</div>
+          <div class="help-item">
+            <div class="help-q" onclick="toggleHelp(this)"><span>Beginner</span><span class="help-arrow">›</span></div>
+            <div class="help-a">Slow notes, long gaps, max 2 on screen. Only natural notes (C D E F G A B) — no sharps. Ideal when you are just starting out and building basic note recognition.</div>
+          </div>
+          <div class="help-item">
+            <div class="help-q" onclick="toggleHelp(this)"><span>Intermediate</span><span class="help-arrow">›</span></div>
+            <div class="help-a">Moderate speed, shorter gaps, up to 3 notes on screen. A good challenge once you have natural notes memorized and want to push your reaction time.</div>
+          </div>
+          <div class="help-item">
+            <div class="help-q" onclick="toggleHelp(this)"><span>Pro</span><span class="help-arrow">›</span></div>
+            <div class="help-a">Fast speed, up to 4 notes simultaneously. Demands quick recognition and immediate execution. Recommended once you can reliably clear Intermediate without losing lives.</div>
+          </div>
+          <div class="help-item">
+            <div class="help-q" onclick="toggleHelp(this)"><span>Shredder</span><span class="help-arrow">›</span></div>
+            <div class="help-a">Maximum speed, up to 5 notes at once, very short intervals. Designed for players who already have solid fretboard knowledge. Enable Sharp Notes in Settings to push it even further.</div>
+          </div>
+        </div>
+
+        <div class="sp-section">
+          <div class="sp-section-label">Tips</div>
+          <div class="help-item">
+            <div class="help-q" onclick="toggleHelp(this)"><span>How does note detection work?</span><span class="help-arrow">›</span></div>
+            <div class="help-a">Your microphone listens for the pitch you play using autocorrelation. Play cleanly and let each note ring briefly — muted or buzzing notes may not register. Keep your mic close to your guitar and make sure background noise is low.</div>
+          </div>
+          <div class="help-item">
+            <div class="help-q" onclick="toggleHelp(this)"><span>Sharp Notes and Octave Mode?</span><span class="help-arrow">›</span></div>
+            <div class="help-a">Sharp Notes (in Settings) adds C# D# F# G# A# to the note pool, making the game harder and more complete. Octave Mode labels each note with its octave number (e.g. C3 or E4), helping you pinpoint the exact fretboard position rather than just the note name.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════
+       MAIN CONTENT
+  ══════════════════════════════ -->
+  <div id="main">
+
+    <!-- HEADER -->
+    <div id="header">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button id="hamburger" onclick="toggleSidebar()">☰</button>
+        <div id="title">NOTE SHOOTER</div>
+      </div>
+      <div id="header-right">
+        <div id="stats" style="display:none;">
+          <div class="stat-block"><div class="stat-label">Score</div><div class="stat-value" id="score-display">0</div></div>
+          <div class="stat-block"><div class="stat-label">Streak</div><div class="stat-value" id="streak-display">0</div></div>
+          <div class="stat-block"><div class="stat-label">Speed</div><div class="stat-value" id="speed-display">1x</div></div>
+          <div class="stat-block"><div class="stat-label">Lives</div><div id="lives-display"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GAME AREA -->
+    <div id="game-area">
+      <canvas id="gameCanvas"></canvas>
+      <div id="detected-note">—</div>
+      <div id="timer-display">60</div>
+      <div id="practice-label">PRACTICE MODE</div>
+      <div id="scale-mode-label"></div>
+      <div id="mic-bar"><div id="mic-dot"></div><span id="mic-label">MIC OFF</span></div>
+      <div id="combo-display"></div>
+      <div id="ch-opponent-left-player" class="ch-centre-msg left"></div>
+
+      <div id="game-controls">
+        <button id="pause-btn" onclick="togglePause()">⏸</button>
+        <button id="exit-btn" onclick="exitToHome()">⏹</button>
+      </div>
+
+      <!-- PAUSE -->
+      <div class="overlay" id="pause-overlay" style="display:none;">
+        <h1>PAUSED</h1>
+        <div class="go-buttons">
+          <button class="start-btn" onclick="togglePause()">RESUME</button>
+          <button class="ghost-btn" onclick="exitToHome()">EXIT TO MENU</button>
+        </div>
+      </div>
+
+      <!-- PRACTICE -->
+      <div id="practice-panel">
+        <div class="section-label">play this note</div>
+        <div id="practice-note-display">—</div>
+        <div id="practice-status"></div>
+        <div id="practice-hint">Find this note anywhere on the fretboard.<br>The fretboard below lights up when you play it correctly.</div>
+        <div id="practice-nav">
+          <button class="ghost-btn" onclick="practiceNext()">NEXT →</button>
+          <button class="ghost-btn" onclick="exitPractice()">← EXIT</button>
+        </div>
+      </div>
+
+      <!-- START OVERLAY -->
+      <div class="overlay" id="start-overlay">
+        <h1>NOTE SHOOTER</h1>
+
+        <div class="section-label">Mode</div>
+        <div class="mode-row">
+          <button class="mode-btn selected" data-mode="classic">CLASSIC</button>
+          <button class="mode-btn" data-mode="timer">60s TIMER</button>
+          <button class="mode-btn" data-mode="scale">SCALE</button>
+          <button class="mode-btn" data-mode="practice">PRACTICE</button>
+          <button class="mode-btn" data-mode="challenge">CHALLENGE</button>
+        </div>
+
+        <!-- Scale Picker -->
+        <div id="scale-picker" style="display:none;flex-direction:column;align-items:center;gap:10px;width:100%;max-width:520px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+            <div class="section-label" style="margin:0;">Root Note</div>
+            <button class="ghost-btn" style="font-size:0.58rem;padding:4px 12px;" onclick="switchToMode('classic')">← MODES</button>
+          </div>
+          <div id="root-note-row" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;"></div>
+          <div class="section-label">Scale Type</div>
+          <div id="scale-type-row" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;"></div>
+          <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;text-align:center;width:100%;">
+            <div style="font-size:0.52rem;color:var(--text3);letter-spacing:2px;margin-bottom:5px;">NOTES IN THIS SCALE</div>
+            <div id="scale-preview-notes" style="font-family:'Righteous',sans-serif;font-size:1rem;color:var(--accent3);letter-spacing:3px;">—</div>
+            <div id="scale-preview-name" style="font-size:0.58rem;color:var(--text3);margin-top:4px;"></div>
+          </div>
+        </div>
+
+        <div class="section-label">Difficulty</div>
+        <div id="difficulty-selector">
+          <button class="diff-btn selected" data-diff="beginner">
+            <span class="diff-name">BEGINNER</span><span class="diff-desc">Slow · Natural notes</span>
+          </button>
+          <button class="diff-btn" data-diff="intermediate">
+            <span class="diff-name">INTERMEDIATE</span><span class="diff-desc">Medium · More notes</span>
+          </button>
+          <button class="diff-btn" data-diff="pro">
+            <span class="diff-name">PRO</span><span class="diff-desc">Fast · 4 at once</span>
+          </button>
+          <button class="diff-btn" data-diff="shredder">
+            <span class="diff-name">SHREDDER</span><span class="diff-desc">Insane · No mercy</span>
+          </button>
+        </div>
+
+        <p style="margin-top:2px;">Notes fall from above. <span>Play the correct note</span> to shoot them down.</p>
+
+        <div id="leaderboard-box">
+          <h3>TOP 10 — LOCAL LEADERBOARD</h3>
+          <div id="lb-list"></div>
+        </div>
+
+        <button class="start-btn" id="start-btn">START GAME</button>
+        <p style="font-size:0.62rem;color:var(--text3);">Allow microphone access when prompted</p>
+      </div>
+
+      <!-- GAME OVER -->
+      <div class="overlay" id="game-over-overlay" style="display:none;">
+        <h1>GAME OVER</h1>
+        <div class="big-score" id="final-score">0</div>
+        <p>Notes hit: <span id="final-hits">0</span> &nbsp;|&nbsp; Best streak: <span id="final-streak">0</span></p>
+        <p id="go-save-msg" style="font-size:0.7rem;min-height:16px;"></p>
+        <div class="go-buttons">
+          <button class="start-btn" id="restart-btn">PLAY AGAIN</button>
+          <button class="ghost-btn" id="menu-btn">← MAIN MENU</button>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════
+           CHALLENGE OVERLAY
+      ══════════════════════════════ -->
+
+      <!-- STEP 1: Create or Join -->
+      <div class="overlay" id="ch-lobby" style="display:none;">
+        <h1>CHALLENGE</h1>
+        <p>Play against a friend. One throws the notes, one shoots them.</p>
+        <div class="go-buttons" style="gap:12px;margin-top:4px;">
+          <button class="start-btn" onclick="chCreate()">CREATE CHALLENGE</button>
+          <button class="start-btn" style="background:transparent;border:2px solid var(--accent);color:var(--accent);" onclick="chShowJoin()">JOIN CHALLENGE</button>
+        </div>
+        <button class="ghost-btn" style="margin-top:8px;font-size:0.62rem;" onclick="switchToMode('classic')">← BACK TO MENU</button>
+      </div>
+
+      <!-- STEP 2a: Creator waiting room -->
+      <div class="overlay" id="ch-create-room" style="display:none;">
+        <div class="section-label">Share this code with your friend</div>
+        <div id="ch-code-display" style="font-family:'Orbitron',sans-serif;font-size:3rem;font-weight:900;color:var(--accent);letter-spacing:10px;"></div>
+        <p id="ch-waiting-msg" style="font-size:0.72rem;">Waiting for friend to join...</p>
+        <div id="ch-creator-ready-section" style="display:none;flex-direction:column;align-items:center;gap:14px;">
+          <div class="section-label">Initial throw cooldown</div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <button onclick="chAdjustCooldown(-0.5)" style="width:32px;height:32px;border:1px solid var(--border2);background:var(--panel2);color:var(--text);font-size:1.1rem;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">‹</button>
+            <div id="ch-cooldown-val" style="font-family:'Orbitron',sans-serif;font-size:1.1rem;font-weight:700;color:var(--accent);width:64px;text-align:center;background:var(--panel2);border:1px solid var(--border2);border-radius:6px;padding:7px 0;">3.0s</div>
+            <button onclick="chAdjustCooldown(0.5)" style="width:32px;height:32px;border:1px solid var(--border2);background:var(--panel2);color:var(--text);font-size:1.1rem;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">›</button>
+          </div>
+          <div style="font-size:0.58rem;color:var(--text3);">Cooldown between throws · decreases as game progresses</div>
+          <div class="section-label">Choose your role</div>
+          <div class="ch-role-row">
+            <button class="ch-role-btn" id="ch-creator-role-thrower" onclick="chSetRole('creator','thrower')">NOTE THROWER<span class="ch-role-desc">You send the notes</span></button>
+            <button class="ch-role-btn" id="ch-creator-role-player" onclick="chSetRole('creator','player')">NOTE PLAYER<span class="ch-role-desc">You shoot the notes</span></button>
+          </div>
+          <div id="ch-friend-role-display" style="font-size:0.65rem;color:var(--text3);min-height:18px;"></div>
+          <label class="ch-ready-label" id="ch-creator-ready-label">
+            <input type="checkbox" id="ch-creator-ready-cb" onchange="chReadyChange()" disabled/>
+            <span>I am ready</span>
+          </label>
+          <div id="ch-friend-ready-display" style="font-size:0.65rem;color:var(--text3);min-height:18px;"></div>
+          <div id="ch-countdown-in-creator" style="font-family:'Orbitron',sans-serif;font-size:1.1rem;font-weight:700;color:var(--accent);min-height:28px;letter-spacing:2px;"></div>
+        </div>
+        <button class="ghost-btn" style="margin-top:12px;font-size:0.62rem;" onclick="chCancel()">CANCEL</button>
+      </div>
+
+      <!-- STEP 2b: Joiner entering code -->
+      <div class="overlay" id="ch-join-room" style="display:none;">
+        <div class="section-label">Enter the challenge code</div>
+        <input id="ch-join-input" type="text" maxlength="6"
+          style="font-family:'Orbitron',sans-serif;font-size:2rem;font-weight:900;
+                 letter-spacing:8px;text-align:center;text-transform:uppercase;
+                 width:220px;padding:14px;background:var(--panel2);
+                 border:1px solid var(--border2);border-radius:8px;
+                 color:var(--accent);outline:none;"
+          placeholder="XXXXXX" oninput="this.value=this.value.toUpperCase()"/>
+        <div id="ch-join-msg" style="font-size:0.68rem;color:var(--accent2);min-height:16px;"></div>
+        <div class="go-buttons">
+          <button class="start-btn" onclick="chJoin()">JOIN</button>
+          <button class="ghost-btn" onclick="chShowLobby()">← BACK</button>
+        </div>
+      </div>
+
+      <!-- STEP 2c: Joiner waiting room (after join, before game) -->
+      <div class="overlay" id="ch-joiner-room" style="display:none;">
+        <div class="section-label">Joined challenge</div>
+        <div id="ch-joined-code" style="font-family:'Orbitron',sans-serif;font-size:2rem;font-weight:900;color:var(--accent);letter-spacing:8px;"></div>
+        <div class="section-label" style="margin-top:8px;">Choose your role</div>
+        <div class="ch-role-row">
+          <button class="ch-role-btn" id="ch-joiner-role-thrower" onclick="chSetRole('joiner','thrower')">NOTE THROWER<span class="ch-role-desc">You send the notes</span></button>
+          <button class="ch-role-btn" id="ch-joiner-role-player" onclick="chSetRole('joiner','player')">NOTE PLAYER<span class="ch-role-desc">You shoot the notes</span></button>
+        </div>
+        <div id="ch-joiner-conflict-msg" style="font-size:0.65rem;color:var(--accent2);min-height:18px;"></div>
+        <label class="ch-ready-label" id="ch-joiner-ready-label">
+          <input type="checkbox" id="ch-joiner-ready-cb" onchange="chReadyChange()" disabled/>
+          <span>I am ready</span>
+        </label>
+        <div id="ch-creator-ready-display" style="font-size:0.65rem;color:var(--text3);min-height:18px;"></div>
+        <div id="ch-countdown-in-joiner" style="font-family:'Orbitron',sans-serif;font-size:1.1rem;font-weight:700;color:var(--accent);min-height:28px;letter-spacing:2px;"></div>
+        <button class="ghost-btn" style="margin-top:12px;font-size:0.62rem;" onclick="chCancel()">LEAVE</button>
+      </div>
+
+      <!-- STEP 4a: NOTE THROWER screen -->
+      <div class="overlay" id="ch-thrower-screen" style="display:none;flex-direction:column;gap:0;padding:0;justify-content:flex-start;">
+
+        <!-- Thrower top bar: stats + pause + exit -->
+        <div style="width:100%;padding:10px 20px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+          <div style="font-family:'Orbitron',sans-serif;font-size:0.8rem;font-weight:900;color:var(--accent);letter-spacing:3px;">NOTE THROWER</div>
+          <div style="display:flex;align-items:center;gap:20px;">
+            <div style="text-align:center;">
+              <div style="font-size:0.5rem;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;">Thrown</div>
+              <div id="ch-thrown-count" style="font-family:'Orbitron',sans-serif;font-size:0.9rem;font-weight:bold;color:var(--text);">0</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:0.5rem;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;">Cooldown</div>
+              <div id="ch-cooldown-display" style="font-family:'Orbitron',sans-serif;font-size:0.9rem;font-weight:bold;color:var(--accent3);">—</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+              <div style="font-size:0.5rem;color:var(--text3);letter-spacing:2px;text-transform:uppercase;">Opponent Lives</div>
+              <div id="ch-thrower-lives" style="display:flex;gap:8px;align-items:flex-end;"></div>
+            </div>
+            <!-- Pause + Exit — same icon style as player's game-controls -->
+            <div style="display:flex;gap:6px;">
+              <button id="ch-thrower-pause-btn"
+                style="width:30px;height:30px;border-radius:6px;border:1px solid var(--border2);background:var(--panel2);color:var(--text2);font-size:0.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;"
+                onmouseover="this.style.borderColor='var(--accent3)';this.style.color='var(--accent3)'"
+                onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'"
+                onclick="chThrowerTogglePause()">⏸</button>
+              <button
+                style="width:30px;height:30px;border-radius:6px;border:1px solid var(--border2);background:var(--panel2);color:var(--text2);font-size:0.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;"
+                onmouseover="this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
+                onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'"
+                onclick="chConfirmExit(chEndChallenge)">⏹</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Thrower pause modal (shown over note sheet) -->
+        <div id="ch-thrower-pause-modal" style="display:none;position:absolute;inset:0;background:var(--overlay);z-index:10;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+          <h1 style="font-family:'Orbitron',sans-serif;font-size:1.5rem;font-weight:900;color:var(--text);letter-spacing:5px;">GAME PAUSED</h1>
+          <!-- Live stats shown inside pause modal -->
+          <div style="width:100%;max-width:300px;">
+            <div style="font-size:0.52rem;color:var(--text3);letter-spacing:3px;text-transform:uppercase;margin-bottom:6px;text-align:center;">Current Stats</div>
+            <div style="display:flex;justify-content:space-between;padding:10px 4px;border-bottom:1px solid var(--border);">
+              <span style="font-size:0.76rem;color:var(--text2);">Notes Thrown</span>
+              <span id="ch-pause-thrown" style="font-family:'Orbitron',sans-serif;font-size:0.82rem;color:var(--accent);font-weight:700;">0</span>
+            </div>
+            <div style="font-size:0.52rem;color:var(--text3);letter-spacing:3px;text-transform:uppercase;margin:10px 0 6px;text-align:center;">Opponent Life Log</div>
+            <div id="ch-pause-lifelog"></div>
+          </div>
+          <div class="go-buttons">
+            <button class="start-btn" onclick="chThrowerTogglePause()">RESUME</button>
+            <button class="ghost-btn" onclick="chConfirmExit(chEndChallenge)">EXIT MATCH</button>
+          </div>
+        </div>
+
+        <!-- Centred messages -->
+        <div id="ch-opponent-left-thrower" class="ch-centre-msg left"></div>
+        <div id="ch-paused-msg-thrower" class="ch-centre-msg paused"></div>
+
+        <!-- Note sheet body -->
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px;overflow-y:auto;">
+          <div class="section-label">Click a note to throw it</div>
+          <div id="ch-throw-msg" style="font-size:0.72rem;color:var(--accent3);min-height:20px;text-align:center;"></div>
+          <div id="ch-note-sheet" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:480px;"></div>
+          <div style="margin-top:4px;width:100%;max-width:280px;">
+            <div class="section-label" style="margin-bottom:8px;">Cooldown progress</div>
+            <div id="ch-cooldown-bar-wrap" style="width:100%;height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;border:1px solid var(--border);">
+              <div id="ch-cooldown-bar" style="height:100%;background:var(--accent);width:100%;transition:width 0.1s linear;border-radius:3px;"></div>
+            </div>
+          </div>
+          <div id="ch-life-stats" style="display:none;flex-direction:column;gap:6px;align-items:center;width:100%;max-width:320px;">
+            <div class="section-label">Opponent life log</div>
+            <div id="ch-life-stats-list" style="width:100%;display:flex;flex-direction:column;gap:0;"></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /game-area -->
+
+    <!-- FRETBOARD -->
+    <div id="fretboard-display"><canvas id="fretCanvas"></canvas></div>
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+// ─────────────────────────────────────────────
+//  CONSTANTS
+// ─────────────────────────────────────────────
+const NATURAL_NOTES=['C','D','E','F','G','A','B'];
+const ALL_NOTES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const STRING_TUNING=[40,45,50,55,59,64];
+const STRING_NAMES=['E₂','A₂','D₃','G₃','B₃','E₄'];
+
+const GUITAR_NOTES_WITH_OCTAVE=[];
+for(let midi=40;midi<=76;midi++){
+  const name=ALL_NOTES[midi%12];
+  const octave=Math.floor(midi/12)-1;
+  GUITAR_NOTES_WITH_OCTAVE.push({name,octave,label:`${name}${octave}`,midi});
+}
+const NATURAL_NOTES_WITH_OCTAVE=GUITAR_NOTES_WITH_OCTAVE.filter(n=>NATURAL_NOTES.includes(n.name));
+
+const DIFFICULTIES={
+  beginner:{speed:60,spawnInterval:3500,maxOnScreen:2},
+  intermediate:{speed:100,spawnInterval:2500,maxOnScreen:3},
+  pro:{speed:160,spawnInterval:1800,maxOnScreen:4},
+  shredder:{speed:240,spawnInterval:1100,maxOnScreen:5},
+};
+const MAX_LIVES=3,MAX_LIVES_CAP=6,TIMER_SECONDS=60;
+
+const NOTE_COLORS={
+  'C':'#ff4455','C#':'#ff7733','D':'#ffcc00','D#':'#aaff00',
+  'E':'#00ff88','F':'#00ffee','F#':'#00ccff','G':'#3388ff',
+  'G#':'#8844ff','A':'#cc44ff','A#':'#ff44cc','B':'#ff4488'
+};
+
+const ACHIEVEMENTS=[
+  {id:'first_game',  icon:'◉', name:'FIRST SHOT',   desc:'Play your first game'},
+  {id:'score_100',   icon:'◈', name:'CENTURY',       desc:'Score 100 points'},
+  {id:'score_500',   icon:'▲', name:'HIGH SCORER',   desc:'Score 500 points'},
+  {id:'score_1000',  icon:'★', name:'NOTE KING',     desc:'Score 1000 points'},
+  {id:'streak_5',    icon:'▶', name:'ON FIRE',        desc:'Hit 5 in a row'},
+  {id:'streak_10',   icon:'▶▶',name:'LIGHTNING',      desc:'Hit 10 in a row'},
+  {id:'streak_20',   icon:'◆', name:'STORM',          desc:'Hit 20 in a row'},
+  {id:'streak_50',   icon:'◆◆',name:'DIAMOND',        desc:'Hit 50 in a row'},
+  {id:'play_shredder',icon:'■',name:'NO MERCY',       desc:'Play Shredder mode'},
+  {id:'play_5',      icon:'●', name:'COMMITTED',      desc:'Play 5 games'},
+  {id:'play_20',     icon:'◉', name:'DEDICATED',      desc:'Play 20 games'},
+  {id:'hits_50',     icon:'✦', name:'SHARP SHOOTER',  desc:'Hit 50 total notes'},
+  {id:'hits_200',    icon:'✦✦',name:'NOTE MASTER',    desc:'Hit 200 total notes'},
+  {id:'timer_win',   icon:'◷', name:'SPEED RUN',      desc:'Survive 60s timer'},
+  {id:'extra_life',  icon:'♡', name:'UNKILLABLE',     desc:'Earn an extra life'},
+  {id:'practice_10', icon:'◌', name:'STUDENT',        desc:'Practice 10 notes'},
+];
+
+const SCALE_TYPES={
+  'Major':         {intervals:[0,2,4,5,7,9,11],  desc:'Happy, bright sound'},
+  'Natural Minor': {intervals:[0,2,3,5,7,8,10],  desc:'Sad, dark sound'},
+  'Pentatonic Maj':{intervals:[0,2,4,7,9],        desc:'5-note major scale'},
+  'Pentatonic Min':{intervals:[0,3,5,7,10],       desc:'Blues/rock favourite'},
+  'Blues':         {intervals:[0,3,5,6,7,10],     desc:'Soul of rock & blues'},
+  'Dorian':        {intervals:[0,2,3,5,7,9,10],   desc:'Minor with bright 6th'},
+  'Mixolydian':    {intervals:[0,2,4,5,7,9,10],   desc:'Major with flat 7th'},
+  'Harmonic Minor':{intervals:[0,2,3,5,7,8,11],   desc:'Exotic, Spanish flavour'},
+  'Phrygian':      {intervals:[0,1,3,5,7,8,10],   desc:'Dark, flamenco feel'},
+  'Lydian':        {intervals:[0,2,4,6,7,9,11],   desc:'Dreamy, ethereal sound'},
+  'Whole Tone':    {intervals:[0,2,4,6,8,10],     desc:'Mysterious, floating'},
+  'Diminished':    {intervals:[0,2,3,5,6,8,9,11], desc:'Tense, suspenseful'},
+};
+const ROOT_NOTES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+function getScaleNotes(root,type){
+  const idx=ROOT_NOTES.indexOf(root);
+  return (SCALE_TYPES[type]?.intervals||[0,2,4,5,7,9,11]).map(i=>ROOT_NOTES[(idx+i)%12]);
+}
+let scaleState={root:'C',type:'Major'};
+function currentScaleNotes(){return getScaleNotes(scaleState.root,scaleState.type);}
+
+// ─────────────────────────────────────────────
+//  GAME STATE
+// ─────────────────────────────────────────────
+let state={
+  running:false,paused:false,score:0,streak:0,bestStreak:0,
+  hits:0,lives:MAX_LIVES,difficulty:'beginner',
+  sharps:false,octaveMode:false,gameMode:'classic',
+  notes:[],particles:[],bullets:[],
+  lastSpawn:0,currentNote:null,
+  timerLeft:TIMER_SECONDS,timerInterval:null,
+  practiceNote:null,practiceHits:0,extraLivesEarned:0,
+};
+
+// ─────────────────────────────────────────────
+//  THEME SYSTEM
+// ─────────────────────────────────────────────
+let currentBase='dark', currentAccent='blue';
+
+function setBase(base){
+  currentBase=base;
+  applyTheme();
+  document.querySelectorAll('.theme-base-btn').forEach(b=>b.classList.toggle('selected',b.dataset.base===base));
+  localStorage.setItem('gs_base',base);
+}
+function setAccent(acc){
+  currentAccent=acc;
+  applyTheme();
+  document.querySelectorAll('.accent-btn').forEach(b=>b.classList.toggle('selected',b.dataset.acc===acc));
+  localStorage.setItem('gs_accent',acc);
+}
+function applyTheme(){
+  document.body.className=`${currentBase} acc-${currentAccent}`;
+}
+function loadTheme(){
+  currentBase=localStorage.getItem('gs_base')||'dark';
+  currentAccent=localStorage.getItem('gs_accent')||'blue';
+  applyTheme();
+  document.querySelectorAll('.theme-base-btn').forEach(b=>b.classList.toggle('selected',b.dataset.base===currentBase));
+  document.querySelectorAll('.accent-btn').forEach(b=>b.classList.toggle('selected',b.dataset.acc===currentAccent));
+}
+
+// ─────────────────────────────────────────────
+//  SIDEBAR NAVIGATION
+// ─────────────────────────────────────────────
+let sidebarOpen=false;
+let currentPanel=null;
+
+function toggleSidebar(){
+  sidebarOpen=!sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('open',sidebarOpen);
+  if(!sidebarOpen){
+    closeSidebarPanel();
+  }
+}
+
+function openPanel(panel){
+  // If sidebar is closed, open it first
+  if(!sidebarOpen){ sidebarOpen=true; document.getElementById('sidebar').classList.add('open'); }
+  // If clicking same panel, toggle close
+  if(currentPanel===panel){ closeSidebarPanel(); return; }
+  currentPanel=panel;
+  // Highlight nav item
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.panel===panel));
+  // Show panel
+  document.getElementById('sidebar-panel').classList.add('open');
+  document.querySelectorAll('.sp-content').forEach(p=>p.style.display='none');
+  document.getElementById('panel-'+panel).style.display='block';
+  // Refresh content
+  if(panel==='account') refreshAccountPanel();
+  if(panel==='dashboard') refreshDashboardPanel();
+}
+
+function closeSidebarPanel(){
+  currentPanel=null;
+  document.getElementById('sidebar-panel').classList.remove('open');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+}
+
+function switchSbTab(tab){
+  document.querySelectorAll('.sb-tab').forEach((t,i)=>t.classList.toggle('active',['history','achievements'][i]===tab));
+  document.querySelectorAll('.sb-sub').forEach(s=>s.classList.remove('active'));
+  document.getElementById('sb-sub-'+tab).classList.add('active');
+}
+
+// ─────────────────────────────────────────────
+//  ACCOUNT SYSTEM
+// ─────────────────────────────────────────────
+let currentUser=null;
+function getUsers(){try{return JSON.parse(localStorage.getItem('gs_users')||'{}');}catch{return {};}}
+function saveUsers(u){localStorage.setItem('gs_users',JSON.stringify(u));}
+function loadSession(){
+  const u=localStorage.getItem('gs_session');
+  if(!u)return;
+  const users=getUsers();
+  if(users[u]){currentUser=u;updateSidebarUserInfo();}
+}
+
+function sbSignup(){
+  const username=document.getElementById('sb-username').value.trim();
+  const password=document.getElementById('sb-password').value;
+  const msg=document.getElementById('sb-auth-msg');
+  if(username.length<3){msg.className='auth-msg error';msg.textContent='Username needs 3+ characters.';return;}
+  if(password.length<4){msg.className='auth-msg error';msg.textContent='Password needs 4+ characters.';return;}
+  const users=getUsers();
+  if(users[username]){msg.className='auth-msg error';msg.textContent='Username taken.';return;}
+  users[username]={password,created:Date.now(),stats:{games:0,bestScore:0,bestStreak:0,totalHits:0,diffCounts:{},practiceNotes:0},history:[],achievements:[]};
+  saveUsers(users);
+  msg.className='auth-msg success';msg.textContent='Account created!';
+  setTimeout(()=>loginAs(username),600);
+}
+
+function sbLogin(){
+  const username=document.getElementById('sb-username').value.trim();
+  const password=document.getElementById('sb-password').value;
+  const msg=document.getElementById('sb-auth-msg');
+  const users=getUsers();
+  if(!users[username]){msg.className='auth-msg error';msg.textContent='Username not found.';return;}
+  if(users[username].password!==password){msg.className='auth-msg error';msg.textContent='Wrong password.';return;}
+  msg.className='auth-msg success';msg.textContent='Welcome back!';
+  setTimeout(()=>loginAs(username),400);
+}
+
+function loginAs(username){
+  currentUser=username;
+  localStorage.setItem('gs_session',username);
+  updateSidebarUserInfo();
+  refreshAccountPanel();
+}
+
+function sbLogout(){
+  currentUser=null;
+  localStorage.removeItem('gs_session');
+  updateSidebarUserInfo();
+  refreshAccountPanel();
+}
+
+function updateSidebarUserInfo(){
+  document.getElementById('sidebar-user-info').textContent=currentUser?currentUser:'Not logged in';
+}
+
+function refreshAccountPanel(){
+  const authSection=document.getElementById('sb-auth-section');
+  const profileSection=document.getElementById('sb-profile-section');
+  if(currentUser){
+    authSection.style.display='none';
+    profileSection.style.display='block';
+    const u=getUsers()[currentUser];
+    document.getElementById('sb-profile-name').textContent=currentUser;
+    document.getElementById('sb-profile-joined').textContent=`Member since ${new Date(u.created).toLocaleDateString()}`;
+    document.getElementById('sb-stat-games').textContent=u.stats.games;
+    document.getElementById('sb-stat-best').textContent=u.stats.bestScore;
+    document.getElementById('sb-stat-streak').textContent=u.stats.bestStreak;
+    document.getElementById('sb-stat-hits').textContent=u.stats.totalHits;
+  } else {
+    authSection.style.display='block';
+    profileSection.style.display='none';
+    document.getElementById('sb-auth-msg').textContent='';
+  }
+}
+
+function refreshDashboardPanel(){
+  // History
+  const histEl=document.getElementById('sb-history-content');
+  if(!currentUser){
+    histEl.innerHTML='<div class="not-logged-msg">Log in to see your history.</div>';
+    document.getElementById('sb-ach-list').innerHTML='<div class="not-logged-msg">Log in to track achievements.</div>';
+    return;
+  }
+  const u=getUsers()[currentUser];
+  const history=u.history||[];
+  if(history.length===0){
+    histEl.innerHTML='<div class="not-logged-msg">No games played yet.</div>';
+  } else {
+    histEl.innerHTML=history.slice(0,20).map(h=>`
+      <div class="sb-history-item">
+        <div class="hi-left">
+          <div class="hi-diff ${h.difficulty}">${h.difficulty.toUpperCase()}${h.mode==='timer'?' · TIMER':h.mode==='scale'?' · SCALE':h.mode==='practice'?' · PRACTICE':''}</div>
+          <div class="hi-date">${new Date(h.date).toLocaleDateString()} ${new Date(h.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+        <div class="hi-right">
+          <div class="hi-score">${h.score}</div>
+          <div class="hi-meta">${h.hits} hits · ${h.streak} streak</div>
+        </div>
+      </div>`).join('');
+  }
+  // Achievements
+  const unlocked=u.achievements||[];
+  document.getElementById('sb-ach-list').innerHTML=ACHIEVEMENTS.map(a=>{
+    const ok=unlocked.includes(a.id);
+    return `<div class="ach-item ${ok?'unlocked':'locked'}">
+      <div class="ach-item-icon">${a.icon}</div>
+      <div class="ach-item-body">
+        <div class="ach-item-name">${a.name}</div>
+        <div class="ach-item-desc">${a.desc}</div>
+      </div>
+      <div class="ach-item-badge">${ok?'DONE':'LOCKED'}</div>
+    </div>`;
+  }).join('');
+}
+
+function saveGameResult(score,hits,bestStreak,difficulty,mode){
+  if(!currentUser)return[];
+  const users=getUsers();const u=users[currentUser];
+  u.stats.games++;
+  if(score>u.stats.bestScore)u.stats.bestScore=score;
+  if(bestStreak>u.stats.bestStreak)u.stats.bestStreak=bestStreak;
+  u.stats.totalHits+=hits;
+  u.stats.diffCounts[difficulty]=(u.stats.diffCounts[difficulty]||0)+1;
+  u.history.unshift({date:Date.now(),score,hits,streak:bestStreak,difficulty,mode});
+  if(u.history.length>30)u.history=u.history.slice(0,30);
+  const prev=[...u.achievements];
+  checkAchievements(u);
+  const newAch=u.achievements.filter(a=>!prev.includes(a));
+  saveUsers(users);
+  return newAch;
+}
+
+function checkAchievements(u){
+  const g=(id)=>{if(!u.achievements.includes(id))u.achievements.push(id);};
+  if(u.stats.games>=1)g('first_game');
+  if(u.stats.bestScore>=100)g('score_100');
+  if(u.stats.bestScore>=500)g('score_500');
+  if(u.stats.bestScore>=1000)g('score_1000');
+  if(u.stats.bestStreak>=5)g('streak_5');
+  if(u.stats.bestStreak>=10)g('streak_10');
+  if(u.stats.bestStreak>=20)g('streak_20');
+  if(u.stats.bestStreak>=50)g('streak_50');
+  if((u.stats.diffCounts['shredder']||0)>=1)g('play_shredder');
+  if(u.stats.games>=5)g('play_5');
+  if(u.stats.games>=20)g('play_20');
+  if(u.stats.totalHits>=50)g('hits_50');
+  if(u.stats.totalHits>=200)g('hits_200');
+  if(state.extraLivesEarned>0)g('extra_life');
+  if(state.gameMode==='timer'&&state.timerLeft>0)g('timer_win');
+  if((u.stats.practiceNotes||0)>=10)g('practice_10');
+}
+
+// ─────────────────────────────────────────────
+//  LEADERBOARD
+// ─────────────────────────────────────────────
+function getLeaderboard(){try{return JSON.parse(localStorage.getItem('gs_leaderboard')||'[]');}catch{return[];}}
+function addToLeaderboard(score,difficulty,mode,name){
+  const lb=getLeaderboard();
+  lb.push({score,difficulty,mode,name:name||'GUEST',date:Date.now()});
+  lb.sort((a,b)=>b.score-a.score);
+  localStorage.setItem('gs_leaderboard',JSON.stringify(lb.slice(0,10)));
+}
+function renderLeaderboard(){
+  const lb=getLeaderboard();
+  const el=document.getElementById('lb-list');
+  const medals=['gold','silver','bronze'];
+  el.innerHTML=lb.length===0
+    ?'<div class="lb-empty">No scores yet — be the first!</div>'
+    :lb.map((e,i)=>`<div class="lb-row">
+        <div class="lb-rank ${medals[i]||''}">${i===0?'#1':i===1?'#2':i===2?'#3':`#${i+1}`}</div>
+        <div class="lb-name">${e.name}</div>
+        <div class="lb-diff">${e.difficulty.toUpperCase()}</div>
+        <div class="lb-score">${e.score}</div>
+      </div>`).join('');
+}
+
+// ─────────────────────────────────────────────
+//  CANVAS
+// ─────────────────────────────────────────────
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const fretCvs=document.getElementById('fretCanvas');
+const fretCtx=fretCvs.getContext('2d');
+
+function resizeCanvases(){
+  const area=document.getElementById('game-area');
+  canvas.width=area.clientWidth;canvas.height=area.clientHeight;
+  const fd=document.getElementById('fretboard-display');
+  fretCvs.width=fd.clientWidth;fretCvs.height=fd.clientHeight;
+  drawFretboard();
+}
+window.addEventListener('resize',resizeCanvases);
+
+// ─────────────────────────────────────────────
+//  FRETBOARD
+// ─────────────────────────────────────────────
+function midiToNote(midi){return ALL_NOTES[midi%12];}
+function drawFretboard(){
+  const W=fretCvs.width,H=fretCvs.height;
+  fretCtx.clearRect(0,0,W,H);
+  const FRETS=12,STRINGS=6,padL=50,padR=20,padT=14,padB=16;
+  const fretW=(W-padL-padR)/FRETS,strH=(H-padT-padB)/(STRINGS-1);
+  const wg=fretCtx.createLinearGradient(0,0,0,H);
+  wg.addColorStop(0,'#2a1a08');wg.addColorStop(1,'#1a0e04');
+  fretCtx.fillStyle=wg;fretCtx.fillRect(0,0,W,H);
+  fretCtx.strokeStyle='#8B6914';fretCtx.lineWidth=2;
+  for(let f=0;f<=FRETS;f++){const x=padL+f*fretW;fretCtx.beginPath();fretCtx.moveTo(x,padT);fretCtx.lineTo(x,H-padB);fretCtx.stroke();}
+  fretCtx.fillStyle='#554422';fretCtx.font='9px Share Tech Mono';fretCtx.textAlign='center';
+  for(let f=1;f<=FRETS;f++)fretCtx.fillText(f,padL+(f-0.5)*fretW,H-2);
+  for(const df of [3,5,7,9,12]){const x=padL+(df-0.5)*fretW;fretCtx.beginPath();fretCtx.arc(x,H/2,df===12?4:3,0,Math.PI*2);fretCtx.fillStyle='#4a3010';fretCtx.fill();}
+  for(let s=0;s<STRINGS;s++){
+    const y=padT+s*strH,t=0.8+(STRINGS-1-s)*0.5;
+    const g=fretCtx.createLinearGradient(0,y-t,0,y+t);
+    g.addColorStop(0,'#ccaa55');g.addColorStop(0.5,'#eecc77');g.addColorStop(1,'#886622');
+    fretCtx.strokeStyle=g;fretCtx.lineWidth=t;
+    fretCtx.beginPath();fretCtx.moveTo(padL,y);fretCtx.lineTo(W-padR,y);fretCtx.stroke();
+  }
+  fretCtx.textAlign='right';fretCtx.font='9px Share Tech Mono';
+  for(let s=0;s<STRINGS;s++){fretCtx.fillStyle='#aa8844';fretCtx.fillText(STRING_NAMES[s],padL-6,padT+s*strH+3);}
+  fretCtx.textAlign='center';
+  for(let s=0;s<STRINGS;s++){
+    for(let f=0;f<=FRETS;f++){
+      const nn=midiToNote(STRING_TUNING[s]+f);
+      const x=f===0?padL-25:padL+(f-0.5)*fretW,y=padT+s*strH;
+      const isActive=state.currentNote&&nn===state.currentNote;
+      const isPractice=state.gameMode==='practice'&&state.practiceNote&&nn===state.practiceNote;
+      if(isActive||isPractice){
+        const col=isPractice&&!isActive?'#ffcc00':NOTE_COLORS[nn]||'#00ff88';
+        fretCtx.beginPath();fretCtx.arc(x,y,9,0,Math.PI*2);
+        fretCtx.fillStyle=col;fretCtx.fill();
+        fretCtx.shadowBlur=12;fretCtx.shadowColor=col;
+        fretCtx.fillStyle='#000';fretCtx.font='bold 7px Righteous,sans-serif';
+        fretCtx.fillText(nn,x,y+3);fretCtx.shadowBlur=0;
+      } else if(f>0){
+        fretCtx.fillStyle='#33291a';fretCtx.font='7px Share Tech Mono';
+        fretCtx.fillText(nn,x,y+3);
+      }
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+//  SOUND ENGINE
+// ─────────────────────────────────────────────
+let sfxCtx=null;
+function getSfxCtx(){
+  if(!sfxCtx||sfxCtx.state==='closed')sfxCtx=new(window.AudioContext||window.webkitAudioContext)();
+  if(sfxCtx.state==='suspended')sfxCtx.resume();
+  return sfxCtx;
+}
+function soundBrickBreak(){
+  const c=getSfxCtx(),now=c.currentTime;
+  const o=c.createOscillator(),g=c.createGain();
+  o.type='sine';o.frequency.setValueAtTime(180,now);o.frequency.exponentialRampToValueAtTime(40,now+0.12);
+  g.gain.setValueAtTime(0.6,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.18);
+  o.connect(g);g.connect(c.destination);o.start(now);o.stop(now+0.18);
+  const buf=c.createBuffer(1,c.sampleRate*0.06,c.sampleRate);
+  const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  const n=c.createBufferSource(),ng=c.createGain();
+  n.buffer=buf;ng.gain.setValueAtTime(0.3,now);ng.gain.exponentialRampToValueAtTime(0.001,now+0.06);
+  n.connect(ng);ng.connect(c.destination);n.start(now);n.stop(now+0.06);
+}
+function soundMiss(){
+  const c=getSfxCtx(),now=c.currentTime;
+  const o=c.createOscillator(),g=c.createGain();
+  o.type='sawtooth';o.frequency.setValueAtTime(80,now);o.frequency.exponentialRampToValueAtTime(30,now+0.25);
+  g.gain.setValueAtTime(0.4,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.25);
+  o.connect(g);g.connect(c.destination);o.start(now);o.stop(now+0.25);
+}
+function soundStreak(s){
+  const c=getSfxCtx(),now=c.currentTime;
+  const freqs={3:523,5:659,10:784,15:988,20:1175,50:1400};
+  let base=523;for(const [k,v] of Object.entries(freqs)){if(s>=+k)base=v;}
+  [base,base*1.26,base*1.5].forEach((freq,i)=>{
+    const t=now+i*0.1,o=c.createOscillator(),g=c.createGain();
+    o.type='triangle';o.frequency.setValueAtTime(freq,t);
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.28,t+0.02);g.gain.exponentialRampToValueAtTime(0.001,t+0.18);
+    o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+0.2);
+  });
+}
+function soundSpeedUp(){
+  const c=getSfxCtx(),now=c.currentTime;
+  const o=c.createOscillator(),g=c.createGain();
+  o.type='square';o.frequency.setValueAtTime(300,now);o.frequency.exponentialRampToValueAtTime(900,now+0.2);
+  g.gain.setValueAtTime(0.18,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.22);
+  o.connect(g);g.connect(c.destination);o.start(now);o.stop(now+0.22);
+}
+function soundExtraLife(){
+  const c=getSfxCtx(),now=c.currentTime;
+  [523,659,784,1047].forEach((freq,i)=>{
+    const t=now+i*0.12,o=c.createOscillator(),g=c.createGain();
+    o.type='triangle';o.frequency.setValueAtTime(freq,t);
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.4,t+0.02);g.gain.exponentialRampToValueAtTime(0.001,t+0.22);
+    o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+0.22);
+  });
+}
+function soundPracticeCorrect(){
+  const c=getSfxCtx(),now=c.currentTime;
+  const o=c.createOscillator(),g=c.createGain();
+  o.type='triangle';o.frequency.setValueAtTime(880,now);o.frequency.exponentialRampToValueAtTime(1100,now+0.1);
+  g.gain.setValueAtTime(0.35,now);g.gain.exponentialRampToValueAtTime(0.001,now+0.2);
+  o.connect(g);g.connect(c.destination);o.start(now);o.stop(now+0.2);
+}
+function showExtraLifeMsg(){
+  const el=document.getElementById('combo-display');
+  el.textContent='+ EXTRA LIFE';
+  el.style.color='var(--accent2)';el.style.opacity=1;
+  clearTimeout(el._t);el._t=setTimeout(()=>{el.style.opacity=0;el.style.color='var(--accent3)';},1800);
+}
+
+// ─────────────────────────────────────────────
+//  PITCH DETECTION
+// ─────────────────────────────────────────────
+let audioCtx,analyser,micStream,pitchBuffer;
+async function startMic(){
+  try{
+    micStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    const src=audioCtx.createMediaStreamSource(micStream);
+    analyser=audioCtx.createAnalyser();analyser.fftSize=4096;
+    src.connect(analyser);pitchBuffer=new Float32Array(analyser.fftSize);
+    document.getElementById('mic-dot').classList.add('active');
+    document.getElementById('mic-label').textContent='MIC ON';
+    detectPitch();
+  }catch(e){
+    document.getElementById('mic-label').textContent='MIC DENIED';
+    alert('Microphone access denied. Please allow mic and refresh.');
+  }
+}
+function stopMic(){
+  if(micStream)micStream.getTracks().forEach(t=>t.stop());
+  if(audioCtx)audioCtx.close();
+  document.getElementById('mic-dot').classList.remove('active');
+  document.getElementById('mic-label').textContent='MIC OFF';
+  analyser=null;
+}
+function autoCorrelate(buf,sr){
+  let rms=0;for(let i=0;i<buf.length;i++)rms+=buf[i]*buf[i];rms=Math.sqrt(rms/buf.length);
+  if(rms<0.01)return -1;
+  let r1=0,r2=buf.length-1;
+  for(let i=0;i<buf.length/2;i++){if(buf[i]<0){r1=i;break;}}
+  for(let i=1;i<buf.length/2;i++){if(buf[buf.length/2-i]>0){r2=buf.length/2-i;break;}}
+  const b2=buf.slice(r1,r2);const c=new Float32Array(b2.length).fill(0);
+  for(let i=0;i<b2.length;i++)for(let j=0;j<b2.length-i;j++)c[i]+=b2[j]*b2[j+i];
+  let d=0;while(c[d]>c[d+1])d++;
+  let maxVal=-1,maxPos=-1;for(let i=d;i<b2.length;i++){if(c[i]>maxVal){maxVal=c[i];maxPos=i;}}
+  let T0=maxPos;
+  if(maxPos>0&&maxPos<b2.length-1){const x1=c[maxPos-1],x2=c[maxPos],x3=c[maxPos+1];T0=maxPos+(x3-x1)/(2*(2*x2-x1-x3));}
+  return sr/T0;
+}
+function freqToNote(freq){
+  if(freq<=0||freq<60||freq>1400)return null;
+  return ALL_NOTES[((Math.round(12*(Math.log2(freq/440))+69)%12)+12)%12];
+}
+let lastNote=null,noteHoldCount=0;
+function detectPitch(){
+  if(!analyser)return;
+  analyser.getFloatTimeDomainData(pitchBuffer);
+  const note=freqToNote(autoCorrelate(pitchBuffer,audioCtx.sampleRate));
+  if(note){
+    if(note===lastNote)noteHoldCount++;else{lastNote=note;noteHoldCount=1;}
+    if(noteHoldCount>=3&&note!==state.currentNote){
+      state.currentNote=note;
+      document.getElementById('detected-note').textContent=note;
+      drawFretboard();
+      if(state.running&&state.gameMode!=='practice')checkShoot(note);
+      if(state.gameMode==='practice')checkPractice(note);
+    }
+  } else {
+    noteHoldCount=0;
+    if(state.currentNote){state.currentNote=null;document.getElementById('detected-note').textContent='—';drawFretboard();}
+  }
+  requestAnimationFrame(detectPitch);
+}
+
+// ─────────────────────────────────────────────
+//  PRACTICE MODE
+// ─────────────────────────────────────────────
+function startPractice(){
+  state.gameMode='practice';state.practiceHits=0;
+  document.getElementById('start-overlay').style.display='none';
+  document.getElementById('practice-panel').classList.add('active');
+  document.getElementById('practice-label').style.display='block';
+  practiceNext();startMic();
+}
+function practiceNext(){
+  const pool=state.sharps?ALL_NOTES:NATURAL_NOTES;
+  state.practiceNote=pool[Math.floor(Math.random()*pool.length)];
+  document.getElementById('practice-note-display').textContent=state.practiceNote;
+  document.getElementById('practice-note-display').style.color=NOTE_COLORS[state.practiceNote]||'var(--accent)';
+  document.getElementById('practice-status').textContent='';
+  drawFretboard();
+}
+function checkPractice(note){
+  if(note===state.practiceNote){
+    soundPracticeCorrect();state.practiceHits++;
+    document.getElementById('practice-status').textContent='Correct!';
+    document.getElementById('practice-status').style.color='var(--accent)';
+    if(currentUser){
+      const users=getUsers();
+      users[currentUser].stats.practiceNotes=(users[currentUser].stats.practiceNotes||0)+1;
+      checkAchievements(users[currentUser]);saveUsers(users);
+    }
+    setTimeout(()=>practiceNext(),900);
+  }
+}
+function exitPractice(){
+  state.gameMode='classic';state.practiceNote=null;stopMic();
+  document.getElementById('practice-panel').classList.remove('active');
+  document.getElementById('practice-label').style.display='none';
+  document.getElementById('start-overlay').style.display='flex';
+  drawFretboard();
+}
+
+// ─────────────────────────────────────────────
+//  GAME LOGIC
+// ─────────────────────────────────────────────
+function getCurrentSpeed(){
+  const cfg=DIFFICULTIES[state.difficulty];
+  return Math.min(cfg.speed*Math.pow(1.12,Math.floor(state.hits/5)),cfg.speed*3.5);
+}
+function spawnNote(){
+  const w=state.octaveMode?66:54,h=36;
+  const x=w+Math.random()*(canvas.width-w*2);
+  let name,label,color;
+  if(state.gameMode==='scale'){
+    const pool=currentScaleNotes();
+    name=pool[Math.floor(Math.random()*pool.length)];label=name;color=NOTE_COLORS[name]||'#00ff88';
+    state.notes.push({name,label,x,y:-h,w:54,h,speed:getCurrentSpeed(),color,wobble:Math.random()*Math.PI*2,wobbleSpeed:0.8+Math.random()*0.8,octave:false});
+  } else if(state.octaveMode){
+    const pool=state.sharps?GUITAR_NOTES_WITH_OCTAVE:NATURAL_NOTES_WITH_OCTAVE;
+    const picked=pool[Math.floor(Math.random()*pool.length)];
+    name=picked.name;label=picked.label;color=NOTE_COLORS[name]||'#00ff88';
+    state.notes.push({name,label,x,y:-h,w,h,speed:getCurrentSpeed(),color,wobble:Math.random()*Math.PI*2,wobbleSpeed:0.8+Math.random()*0.8,octave:true});
+  } else {
+    const pool=state.sharps?ALL_NOTES:NATURAL_NOTES;
+    name=pool[Math.floor(Math.random()*pool.length)];label=name;color=NOTE_COLORS[name]||'#00ff88';
+    state.notes.push({name,label,x,y:-h,w,h,speed:getCurrentSpeed(),color,wobble:Math.random()*Math.PI*2,wobbleSpeed:0.8+Math.random()*0.8,octave:false});
+  }
+}
+function checkShoot(note){
+  let target=null,maxY=-Infinity;
+  for(const n of state.notes){if(n.name===note&&n.y>maxY){maxY=n.y;target=n;}}
+  if(target)hitNote(target);
+}
+function hitNote(note){
+  state.notes=state.notes.filter(n=>n!==note);
+  state.score+=10+state.streak*2;state.streak++;state.hits++;
+  if(state.streak>state.bestStreak)state.bestStreak=state.streak;
+  soundBrickBreak();
+  if([3,5,10,15,20,25,30,50,150,300].includes(state.streak))soundStreak(state.streak);
+  if(state.hits>0&&state.hits%5===0)soundSpeedUp();
+  if([50,150,300].includes(state.streak)&&state.lives<MAX_LIVES_CAP){
+    state.lives++;state.extraLivesEarned++;soundExtraLife();showExtraLifeMsg();
+  }
+  updateHUD();spawnParticles(note.x,note.y,note.color);
+  spawnBulletFlash(note.x,note.y,note.color);showCombo(state.streak);
+}
+function missNote(note){
+  state.notes=state.notes.filter(n=>n!==note);
+  state.streak=0;state.lives--;soundMiss();updateHUD();screenFlash();
+  // In challenge mode, record which throw caused this life loss
+  if(state.gameMode==='challenge' && ch.code){
+    const room=chRead(ch.code);
+    if(room?.gameState){
+      room.gameState.livesLostAt = room.gameState.livesLostAt||{};
+      // slot = the life number that was just lost (3 = first loss, 2 = second, 1 = third)
+      const slot = state.lives + 1;
+      room.gameState.livesLostAt[slot] = room.gameState.thrownCount||0;
+      chWrite(ch.code,room);
+    }
+  }
+  if(state.lives<=0)endGame();
+}
+function showCombo(s){
+  if(s<3)return;
+  const el=document.getElementById('combo-display');
+  el.textContent=s>=10?`${s}x COMBO`:`${s}x COMBO`;
+  el.style.color='var(--accent3)';el.style.opacity=1;
+  clearTimeout(el._t);el._t=setTimeout(()=>{el.style.opacity=0;},900);
+}
+let flashActive=false;
+function screenFlash(){
+  if(flashActive)return;flashActive=true;
+  canvas.style.outline='3px solid var(--accent2)';
+  setTimeout(()=>{canvas.style.outline='none';flashActive=false;},300);
+}
+function spawnParticles(x,y,color){
+  for(let i=0;i<18;i++){
+    const a=Math.random()*Math.PI*2,s=2+Math.random()*5;
+    state.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,decay:0.025+Math.random()*0.03,size:3+Math.random()*4,color});
+  }
+}
+function spawnBulletFlash(tx,ty,color){
+  state.bullets.push({x1:canvas.width/2,y1:canvas.height,x2:tx,y2:ty,color,life:1});
+}
+function updateHUD(){
+  document.getElementById('score-display').textContent=state.score;
+  document.getElementById('streak-display').textContent=state.streak;
+  const boosts=Math.floor(state.hits/5);
+  const mult=Math.min(Math.pow(1.12,boosts),3.5);
+  document.getElementById('speed-display').textContent=mult.toFixed(1)+'x';
+  const el=document.getElementById('lives-display');el.innerHTML='';
+  for(let i=0;i<Math.max(MAX_LIVES_CAP,state.lives);i++){
+    const s=document.createElement('span');
+    s.className='life-icon'+(i>=state.lives?' lost':'');
+    s.textContent=i>=MAX_LIVES?'♡':'♥';el.appendChild(s);
+  }
+}
+
+// ─────────────────────────────────────────────
+//  TIMER MODE
+// ─────────────────────────────────────────────
+function startTimer(){
+  state.timerLeft=TIMER_SECONDS;
+  const el=document.getElementById('timer-display');
+  el.style.display='block';el.textContent=TIMER_SECONDS;
+  state.timerInterval=setInterval(()=>{
+    state.timerLeft--;
+    el.textContent=state.timerLeft;
+    el.style.color=state.timerLeft<=10?'var(--accent2)':'var(--accent3)';
+    if(state.timerLeft<=0){clearInterval(state.timerInterval);endGame();}
+  },1000);
+}
+function resumeTimer(){
+  state.timerInterval=setInterval(()=>{
+    state.timerLeft--;
+    const el=document.getElementById('timer-display');
+    el.textContent=state.timerLeft;
+    el.style.color=state.timerLeft<=10?'var(--accent2)':'var(--accent3)';
+    if(state.timerLeft<=0){clearInterval(state.timerInterval);endGame();}
+  },1000);
+}
+function stopTimer(){
+  clearInterval(state.timerInterval);
+  document.getElementById('timer-display').style.display='none';
+}
+
+// ─────────────────────────────────────────────
+//  GAME LOOP
+// ─────────────────────────────────────────────
+let lastTime=0;
+function gameLoop(ts){
+  if(!state.running)return;
+  const dt=(ts-lastTime)/1000;lastTime=ts;
+  const cfg=DIFFICULTIES[state.difficulty];
+  // Only auto-spawn in non-challenge modes
+  if(state.gameMode!=='challenge'){
+    if(ts-state.lastSpawn>cfg.spawnInterval&&state.notes.length<cfg.maxOnScreen){spawnNote();state.lastSpawn=ts;}
+  }
+  for(const n of state.notes){n.y+=n.speed*dt;n.wobble+=n.wobbleSpeed*dt;}
+  state.notes.filter(n=>n.y-n.h/2>canvas.height-110).forEach(n=>missNote(n));
+  state.particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=0.15;p.life-=p.decay;});
+  state.particles=state.particles.filter(p=>p.life>0);
+  state.bullets.forEach(b=>b.life-=0.12);
+  state.bullets=state.bullets.filter(b=>b.life>0);
+  draw();requestAnimationFrame(gameLoop);
+}
+
+function draw(){
+  const W=canvas.width,H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  // subtle grid
+  ctx.strokeStyle=currentBase==='dark'?'rgba(255,255,255,0.03)':'rgba(0,0,0,0.04)';
+  ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  drawGuitarIcon(W/2,H-110-30);
+  for(const b of state.bullets){
+    ctx.save();ctx.globalAlpha=b.life;ctx.strokeStyle=b.color;ctx.lineWidth=2;
+    ctx.setLineDash([6,4]);ctx.beginPath();ctx.moveTo(b.x1,b.y1);ctx.lineTo(b.x2,b.y2);ctx.stroke();
+    ctx.setLineDash([]);ctx.restore();
+  }
+  for(const n of state.notes)drawFallingNote(n);
+  for(const p of state.particles){
+    ctx.save();ctx.globalAlpha=p.life;ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();ctx.restore();
+  }
+  ctx.save();ctx.strokeStyle='rgba(255,51,102,0.2)';ctx.lineWidth=1;
+  ctx.setLineDash([8,6]);ctx.beginPath();ctx.moveTo(0,H-110-10);ctx.lineTo(W,H-110-10);ctx.stroke();
+  ctx.setLineDash([]);ctx.restore();
+}
+
+function drawFallingNote(n){
+  const wx=Math.sin(n.wobble)*5;
+  const x=n.x+wx,y=n.y,w=n.w,h=n.h,r=7;
+  ctx.save();
+  ctx.beginPath();ctx.roundRect(x-w/2,y-h/2,w,h,r);ctx.fillStyle='#2b1a0e';ctx.fill();
+  ctx.beginPath();ctx.roundRect(x-w/2+2,y-h/2+2,w-4,h-6,r-2);ctx.fillStyle='#3a2210';ctx.fill();
+  ctx.beginPath();ctx.roundRect(x-w/2,y-h/2,w,5,[r,r,0,0]);ctx.fillStyle=n.color+'bb';ctx.fill();
+  ctx.beginPath();ctx.roundRect(x-w/2,y-h/2,w,h,r);
+  ctx.strokeStyle=n.color+'88';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle='#ffffff';
+  ctx.font=`${n.octave?13:17}px 'Righteous',sans-serif`;
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(n.label,x,y+2);
+  ctx.restore();
+}
+
+function drawGuitarIcon(x,y){
+  const accentColor=currentAccent==='pink'?'#e870a0':'#4a9eff';
+  ctx.save();ctx.translate(x,y);
+  ctx.fillStyle=accentColor+'22';ctx.beginPath();ctx.ellipse(0,5,18,22,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle=accentColor+'88';ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(0,5,18,22,0,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.arc(0,8,7,0,Math.PI*2);ctx.strokeStyle=accentColor+'44';ctx.lineWidth=1;ctx.stroke();
+  ctx.fillStyle=accentColor+'66';ctx.fillRect(-3,-24,6,26);
+  ctx.strokeStyle=accentColor+'33';ctx.lineWidth=1;
+  for(let i=-2;i<=2;i++){ctx.beginPath();ctx.moveTo(i*1.4,-24);ctx.lineTo(i*1.4,24);ctx.stroke();}
+  ctx.strokeStyle=accentColor+'44';ctx.setLineDash([3,4]);
+  ctx.beginPath();ctx.moveTo(0,-28);ctx.lineTo(0,-80);ctx.stroke();
+  ctx.setLineDash([]);ctx.restore();
+}
+
+// ─────────────────────────────────────────────
+//  GAME START / END / MENU
+// ─────────────────────────────────────────────
+async function startGame(){
+  if(state.gameMode==='practice'){startPractice();return;}
+  state={...state,running:true,paused:false,score:0,streak:0,bestStreak:0,
+    hits:0,lives:MAX_LIVES,notes:[],particles:[],bullets:[],
+    lastSpawn:0,currentNote:null,extraLivesEarned:0};
+  document.getElementById('start-overlay').style.display='none';
+  document.getElementById('game-over-overlay').style.display='none';
+  document.getElementById('detected-note').textContent='—';
+  document.getElementById('stats').style.display='flex';
+  document.getElementById('game-controls').classList.add('visible');
+  document.getElementById('pause-btn').textContent='⏸';
+  // Scale label
+  const sl=document.getElementById('scale-mode-label');
+  if(state.gameMode==='scale'){sl.textContent=`${scaleState.root} ${scaleState.type}  ·  ${currentScaleNotes().join(' ')}`;sl.style.display='block';}
+  else sl.style.display='none';
+  updateHUD();
+  if(state.gameMode==='timer')startTimer();
+  await startMic();
+  lastTime=performance.now();requestAnimationFrame(gameLoop);
+}
+
+function goToMenu(){
+  state.running=false;stopMic();stopTimer();
+  document.getElementById('game-over-overlay').style.display='none';
+  // Restore game-over overlay to default in case challenge mode rewrote it
+  document.getElementById('game-over-overlay').innerHTML=`
+    <h1>GAME OVER</h1>
+    <div class="big-score" id="final-score">0</div>
+    <p>Notes hit: <span id="final-hits">0</span> &nbsp;|&nbsp; Best streak: <span id="final-streak">0</span></p>
+    <p id="go-save-msg" style="font-size:0.7rem;min-height:16px;"></p>
+    <div class="go-buttons">
+      <button class="start-btn" id="restart-btn">PLAY AGAIN</button>
+      <button class="ghost-btn" id="menu-btn">← MAIN MENU</button>
+    </div>`;
+  document.getElementById('restart-btn').addEventListener('click',startGame);
+  document.getElementById('menu-btn').addEventListener('click',goToMenu);
+  document.getElementById('scale-mode-label').style.display='none';
+  document.getElementById('game-controls').classList.remove('visible');
+  document.getElementById('pause-overlay').style.display='none';
+  document.getElementById('stats').style.display='none';
+  document.getElementById('start-overlay').style.display='flex';
+  renderLeaderboard();
+}
+
+function exitToHome(){state.paused=false;goToMenu();}
+
+function togglePause(){
+  if(!state.running&&!state.paused)return;
+  state.paused=!state.paused;
+  const po=document.getElementById('pause-overlay');
+  const pb=document.getElementById('pause-btn');
+  if(state.paused){
+    state.running=false;po.style.display='flex';pb.textContent='▶';
+    if(state.timerInterval)clearInterval(state.timerInterval);
+  } else {
+    state.running=true;po.style.display='none';pb.textContent='⏸';
+    if(state.gameMode==='timer')resumeTimer();
+    lastTime=performance.now();requestAnimationFrame(gameLoop);
+  }
+}
+
+function endGame(){
+  if(state.gameMode==='challenge'){
+    // Player ran out of lives — natural game over
+    state.running=false; stopMic();
+    clearInterval(ch.pollInterval);
+    const myCode=ch.code;
+    const room=chRead(myCode);
+    if(room){
+      if(!room.gameState) room.gameState={notes:[],thrownCount:0,gameOver:false,livesLostAt:{}};
+      room.gameState.gameOver=true;
+      room.gameState.playerLost=true;
+      chWrite(myCode,room);
+    }
+    setTimeout(()=>chClear(myCode),4000);
+    ch.code=null; ch.myRole=null;
+    // Per PDF: player sees their own score/stats with Back to Home
+    chShowPlayerStats('GAME OVER');
+    return;
+  }
+  state.running=false;stopMic();stopTimer();
+  document.getElementById('game-controls').classList.remove('visible');
+  document.getElementById('scale-mode-label').style.display='none';
+  document.getElementById('stats').style.display='none';
+  addToLeaderboard(state.score,state.difficulty,state.gameMode,currentUser||'GUEST');
+  const newAch=saveGameResult(state.score,state.hits,state.bestStreak,state.difficulty,state.gameMode);
+  const msg=document.getElementById('go-save-msg');
+  if(currentUser){
+    msg.style.color='var(--accent)';
+    msg.textContent=newAch.length>0?`Saved · New: ${ACHIEVEMENTS.find(a=>a.id===newAch[0])?.name}`:'Result saved to your account';
+  } else {
+    msg.style.color='var(--accent3)';
+    msg.textContent='Log in to save your results.';
+  }
+  document.getElementById('final-score').textContent=state.score;
+  document.getElementById('final-hits').textContent=state.hits;
+  document.getElementById('final-streak').textContent=state.bestStreak;
+  document.getElementById('game-over-overlay').style.display='flex';
+}
+
+// ─────────────────────────────────────────────
+//  SETTINGS TOGGLES
+// ─────────────────────────────────────────────
+function toggleSharps(){
+  state.sharps=!state.sharps;
+  document.getElementById('sharps-toggle').classList.toggle('on',state.sharps);
+}
+function toggleOctave(){
+  state.octaveMode=!state.octaveMode;
+  document.getElementById('octave-toggle').classList.toggle('on',state.octaveMode);
+}
+function toggleHelp(qEl){
+  const aEl=qEl.nextElementSibling;
+  const isOpen=qEl.classList.contains('open');
+  // close all others in same section
+  qEl.closest('.sp-section').querySelectorAll('.help-q').forEach(q=>{
+    q.classList.remove('open');
+    q.nextElementSibling.classList.remove('open');
+  });
+  if(!isOpen){ qEl.classList.add('open'); aEl.classList.add('open'); }
+}
+
+// ─────────────────────────────────────────────
+//  CHALLENGE MODE
+// ─────────────────────────────────────────────
+// Simulated multiplayer using localStorage as the shared "server".
+// Both players must be on the same browser (different tabs).
+// When Firebase is added later, replace the ch_read/ch_write calls.
+
+const CH_NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+let ch = {
+  code: null,
+  role: null,
+  myRole: null,
+  thrownCount: 0,
+  initialCooldownMs: 3000,  // set by creator, default 3s
+  cooldownMs: 3000,
+  cooldownActive: false,
+  cooldownTimer: null,
+  cooldownBarTimer: null,
+  pollInterval: null,
+};
+
+function chAdjustCooldown(delta){
+  const current = ch.initialCooldownMs / 1000;
+  const next = Math.round((current + delta) * 10) / 10;
+  if(next < 0.5 || next > 10) return;
+  ch.initialCooldownMs = next * 1000;
+  document.getElementById('ch-cooldown-val').textContent = next.toFixed(1)+'s';
+  // Save to room so joiner can see it (optional info)
+  const room = chRead(ch.code);
+  if(room){ room.initialCooldownMs = ch.initialCooldownMs; chWrite(ch.code, room); }
+}
+
+// ── Shared "DB" via localStorage ──
+function chWrite(code, data){
+  localStorage.setItem('ch_room_'+code, JSON.stringify(data));
+}
+function chRead(code){
+  try{ return JSON.parse(localStorage.getItem('ch_room_'+code)||'null'); }catch{ return null; }
+}
+function chClear(code){
+  localStorage.removeItem('ch_room_'+code);
+}
+
+function chGenCode(){
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code='';
+  for(let i=0;i<6;i++) code+=chars[Math.floor(Math.random()*chars.length)];
+  return code;
+}
+
+function chHideAll(){
+  ['ch-lobby','ch-create-room','ch-join-room','ch-joiner-room',
+   'ch-thrower-screen'].forEach(id=>{
+    document.getElementById(id).style.display='none';
+  });
+}
+
+function chShowLobby(){
+  chHideAll();
+  document.getElementById('ch-lobby').style.display='flex';
+}
+
+function chShowJoin(){
+  chHideAll();
+  document.getElementById('ch-join-room').style.display='flex';
+  document.getElementById('ch-join-msg').textContent='';
+  document.getElementById('ch-join-input').value='';
+}
+
+// ── CREATE ──
+function chCreate(){
+  const code = chGenCode();
+  ch.code = code;
+  ch.role = 'creator';
+  ch.myRole = null;
+
+  chWrite(code, {
+    creator:{ role:null, ready:false },
+    joiner:null,
+    initialCooldownMs: ch.initialCooldownMs,
+  });
+
+  // Reset cooldown picker to current value
+  ch.initialCooldownMs = 3000;
+  const cdVal = document.getElementById('ch-cooldown-val');
+  if(cdVal) cdVal.textContent = '3.0s';
+
+  chHideAll();
+  document.getElementById('ch-create-room').style.display='flex';
+  document.getElementById('ch-code-display').textContent = code;
+  document.getElementById('ch-waiting-msg').style.display='block';
+  document.getElementById('ch-creator-ready-section').style.display='none';
+  document.getElementById('ch-creator-ready-cb').checked=false;
+  document.getElementById('ch-creator-ready-cb').disabled=true;
+  document.getElementById('ch-creator-role-thrower').classList.remove('selected','conflict');
+  document.getElementById('ch-creator-role-player').classList.remove('selected','conflict');
+  document.getElementById('ch-friend-role-display').textContent='';
+  document.getElementById('ch-friend-ready-display').textContent='';
+
+  // Poll for joiner
+  ch.pollInterval = setInterval(()=>{
+    const room = chRead(ch.code);
+    if(!room) return;
+    if(room.joiner !== null){
+      clearInterval(ch.pollInterval);
+      document.getElementById('ch-waiting-msg').style.display='none';
+      document.getElementById('ch-creator-ready-section').style.display='flex';
+      // Now poll for role changes and ready state
+      ch.pollInterval = setInterval(chPollCreator, 400);
+    }
+  }, 500);
+}
+
+function chPollCreator(){
+  const room = chRead(ch.code);
+  if(!room) return;
+  const friendRole = room.joiner?.role || null;
+  const friendReady = room.joiner?.ready || false;
+
+  // Conflict: both picked same role
+  const conflict = ch.myRole && friendRole && ch.myRole === friendRole;
+  document.getElementById('ch-creator-role-thrower').classList.toggle('conflict', conflict && ch.myRole==='thrower');
+  document.getElementById('ch-creator-role-player').classList.toggle('conflict', conflict && ch.myRole==='player');
+
+  if(conflict){
+    document.getElementById('ch-friend-role-display').textContent = `Friend also chose ${friendRole} — one of you must switch`;
+    document.getElementById('ch-creator-ready-cb').disabled = true;
+    // Uncheck if it was checked
+    document.getElementById('ch-creator-ready-cb').checked = false;
+    const r = chRead(ch.code); if(r){ r.creator.ready=false; chWrite(ch.code,r); }
+  } else {
+    document.getElementById('ch-creator-role-thrower').classList.remove('conflict');
+    document.getElementById('ch-creator-role-player').classList.remove('conflict');
+    document.getElementById('ch-friend-role-display').textContent = friendRole ? `Friend is: ${friendRole.toUpperCase()}` : 'Friend choosing role...';
+    // Enable if own role is selected (don't need friend to have picked yet)
+    document.getElementById('ch-creator-ready-cb').disabled = !ch.myRole;
+  }
+
+  document.getElementById('ch-friend-ready-display').textContent = friendReady ? '✓ Friend is ready' : '';
+
+  // Start countdown only when both ready AND roles are different
+  const myReady = document.getElementById('ch-creator-ready-cb').checked;
+  if(myReady && friendReady && ch.myRole && friendRole && ch.myRole !== friendRole){
+    if(!chCountdownInterval){ clearInterval(ch.pollInterval); chStartCountdown(); }
+  }
+}
+
+// ── JOIN ──
+function chJoin(){
+  const code = document.getElementById('ch-join-input').value.trim().toUpperCase();
+  if(code.length !== 6){ document.getElementById('ch-join-msg').textContent='Enter a 6-character code.'; return; }
+  const room = chRead(code);
+  if(!room){ document.getElementById('ch-join-msg').textContent='Room not found. Check the code.'; return; }
+  if(room.joiner !== null){ document.getElementById('ch-join-msg').textContent='Room is already full.'; return; }
+
+  ch.code = code;
+  ch.role = 'joiner';
+  ch.myRole = null;
+
+  // Write joiner in
+  room.joiner = { role:null, ready:false };
+  chWrite(code, room);
+
+  chHideAll();
+  document.getElementById('ch-joiner-room').style.display='flex';
+  document.getElementById('ch-joined-code').textContent = code;
+  document.getElementById('ch-joiner-ready-cb').checked=false;
+  document.getElementById('ch-joiner-ready-cb').disabled=true;
+  document.getElementById('ch-joiner-role-thrower').classList.remove('selected','conflict');
+  document.getElementById('ch-joiner-role-player').classList.remove('selected','conflict');
+  document.getElementById('ch-joiner-conflict-msg').textContent='';
+  document.getElementById('ch-creator-ready-display').textContent='';
+
+  ch.pollInterval = setInterval(chPollJoiner, 400);
+}
+
+function chPollJoiner(){
+  const room = chRead(ch.code);
+  if(!room) return;
+  const friendRole = room.creator?.role || null;
+  const friendReady = room.creator?.ready || false;
+
+  const conflict = ch.myRole && friendRole && ch.myRole === friendRole;
+  document.getElementById('ch-joiner-role-thrower').classList.toggle('conflict', conflict && ch.myRole==='thrower');
+  document.getElementById('ch-joiner-role-player').classList.toggle('conflict', conflict && ch.myRole==='player');
+
+  if(conflict){
+    document.getElementById('ch-joiner-conflict-msg').textContent = `Friend also chose ${friendRole} — one of you must switch`;
+    document.getElementById('ch-joiner-ready-cb').disabled = true;
+    document.getElementById('ch-joiner-ready-cb').checked = false;
+    const r = chRead(ch.code); if(r){ r.joiner.ready=false; chWrite(ch.code,r); }
+  } else {
+    document.getElementById('ch-joiner-role-thrower').classList.remove('conflict');
+    document.getElementById('ch-joiner-role-player').classList.remove('conflict');
+    document.getElementById('ch-joiner-conflict-msg').textContent = friendRole ? `Friend is: ${friendRole.toUpperCase()}` : '';
+    // Enable as soon as own role is picked
+    document.getElementById('ch-joiner-ready-cb').disabled = !ch.myRole;
+  }
+
+  document.getElementById('ch-creator-ready-display').textContent = friendReady ? '✓ Friend is ready' : '';
+
+  const myReady = document.getElementById('ch-joiner-ready-cb').checked;
+  if(myReady && friendReady && ch.myRole && friendRole && ch.myRole !== friendRole){
+    if(!chCountdownInterval){ clearInterval(ch.pollInterval); chStartCountdown(); }
+  }
+}
+
+// ── ROLE SELECTION ──
+function chSetRole(who, role){
+  ch.myRole = role;
+  const prefix = who==='creator' ? 'ch-creator-role' : 'ch-joiner-role';
+  document.getElementById(prefix+'-thrower').classList.toggle('selected', role==='thrower');
+  document.getElementById(prefix+'-player').classList.toggle('selected', role==='player');
+
+  // Write to room
+  const room = chRead(ch.code);
+  if(!room) return;
+  if(who==='creator') room.creator.role = role;
+  else room.joiner.role = role;
+  chWrite(ch.code, room);
+}
+
+// ── COUNTDOWN ──
+let chCountdownInterval = null;
+let chCountdownValue = 0;
+
+function chStartCountdown(){
+  chCountdownValue = 7;
+  chUpdateCountdownUI();
+  const room = chRead(ch.code);
+  if(room){ room.countdown = chCountdownValue; chWrite(ch.code, room); }
+  chClearCountdown();
+  chCountdownInterval = setInterval(()=>{
+    const room = chRead(ch.code);
+    if(!room) return;
+    const creatorReady = room.creator?.ready || false;
+    const joinerReady  = room.joiner?.ready  || false;
+    if(!creatorReady || !joinerReady){
+      chClearCountdown();
+      chCountdownValue = 0;
+      chUpdateCountdownUI();
+      if(ch.role==='creator') ch.pollInterval = setInterval(chPollCreator, 400);
+      else                     ch.pollInterval = setInterval(chPollJoiner,  400);
+      return;
+    }
+    chCountdownValue--;
+    chUpdateCountdownUI();
+    if(ch.role==='creator'){ room.countdown = chCountdownValue; chWrite(ch.code, room); }
+    if(chCountdownValue <= 0){ chClearCountdown(); chStartGame(); }
+  }, 1000);
+}
+
+function chClearCountdown(){
+  if(chCountdownInterval){ clearInterval(chCountdownInterval); chCountdownInterval=null; }
+}
+
+function chUpdateCountdownUI(){
+  const text = chCountdownValue > 0 ? `Starting in ${chCountdownValue}...` : '';
+  const creatorEl = document.getElementById('ch-countdown-in-creator');
+  const joinerEl  = document.getElementById('ch-countdown-in-joiner');
+  if(creatorEl) creatorEl.textContent = text;
+  if(joinerEl)  joinerEl.textContent  = text;
+}
+
+function chReadyChange(){
+  const room = chRead(ch.code);
+  if(!room) return;
+  const myReady = ch.role==='creator'
+    ? document.getElementById('ch-creator-ready-cb').checked
+    : document.getElementById('ch-joiner-ready-cb').checked;
+  if(ch.role==='creator') room.creator.ready = myReady;
+  else room.joiner.ready = myReady;
+  chWrite(ch.code, room);
+  if(!myReady && chCountdownInterval){
+    chClearCountdown();
+    chCountdownValue = 0;
+    chUpdateCountdownUI();
+    if(ch.role==='creator') ch.pollInterval = setInterval(chPollCreator, 400);
+    else                     ch.pollInterval = setInterval(chPollJoiner,  400);
+  }
+}
+
+// ── START GAME ──
+function chStartGame(){
+  chHideAll();
+  ch.thrownCount = 0;
+  // Use the creator's chosen initial cooldown
+  const room = chRead(ch.code);
+  ch.initialCooldownMs = room?.initialCooldownMs || 3000;
+  ch.cooldownMs = ch.initialCooldownMs;
+  ch.cooldownActive = false;
+  if(ch.myRole === 'thrower'){
+    chStartThrowerScreen();
+  } else {
+    chStartPlayerScreen();
+  }
+}
+
+// ── THROWER SCREEN ──
+function chStartThrowerScreen(){
+  document.getElementById('ch-thrower-screen').style.display='flex';
+  document.getElementById('ch-thrown-count').textContent='0';
+  document.getElementById('ch-throw-msg').textContent='Ready to throw!';
+  document.getElementById('ch-life-stats').style.display='none';
+  document.getElementById('ch-life-stats-list').innerHTML='';
+  document.getElementById('ch-opponent-left-thrower').style.display='none';
+  document.getElementById('ch-paused-msg-thrower').style.display='none';
+  document.getElementById('ch-thrower-pause-modal').style.display='none';
+  document.getElementById('ch-thrower-pause-btn').textContent='⏸';
+  chUpdateCooldownDisplay();
+  chRenderThrowerLives(MAX_LIVES, {});
+
+  // Build note sheet
+  const sheet = document.getElementById('ch-note-sheet');
+  sheet.innerHTML='';
+  CH_NOTES.forEach(note=>{
+    const btn = document.createElement('button');
+    btn.className='ch-note-btn';
+    btn.textContent=note;
+    btn.style.borderColor=(NOTE_COLORS[note]||'#888')+'66';
+    btn.onclick=()=>chThrowNote(note, btn);
+    sheet.appendChild(btn);
+  });
+
+  // Write initial game state
+  const room = chRead(ch.code)||{};
+  room.gameState = { notes:[], thrownCount:0, gameOver:false, score:0, paused:false, playerLeft:false, livesLostAt:{} };
+  chWrite(ch.code, room);
+
+  ch.pollInterval = setInterval(()=>{
+    const room = chRead(ch.code);
+    if(!room?.gameState) return;
+
+    // Player voluntarily left — per PDF: show "Opponent Left" with See Statistics / Exit
+    if(room.gameState.playerLeft){
+      clearInterval(ch.pollInterval);
+      clearTimeout(ch.cooldownTimer);
+      document.getElementById('ch-paused-msg-thrower').style.display='none';
+      document.querySelectorAll('.ch-note-btn').forEach(b=>b.disabled=true);
+      const savedGs = room.gameState;
+      const el = document.getElementById('ch-opponent-left-thrower');
+      el.innerHTML=`
+        <div style="font-family:'Orbitron',sans-serif;font-size:0.9rem;font-weight:900;letter-spacing:2px;margin-bottom:10px;">OPPONENT LEFT</div>
+        <div style="font-size:0.68rem;opacity:0.75;margin-bottom:16px;">Your opponent has exited the match.</div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+          <button onclick="chShowThrowerStats(chRead(ch.code||'_')?.gameState||{thrownCount:${ch.thrownCount},livesLostAt:${JSON.stringify(room.gameState.livesLostAt||{})}}, 'CHALLENGE OVER')" style="padding:8px 18px;background:var(--accent);color:#fff;border:none;font-family:'Share Tech Mono',monospace;font-size:0.68rem;cursor:pointer;border-radius:6px;">VIEW STATISTICS</button>
+          <button onclick="goToMenu()" style="padding:8px 18px;background:transparent;border:1px solid var(--border2);color:var(--text2);font-family:'Share Tech Mono',monospace;font-size:0.68rem;cursor:pointer;border-radius:6px;">EXIT</button>
+        </div>`;
+      el.style.display='block';
+      return;
+    }
+
+    // Player lost all lives naturally — show opponent lost stats
+    if(room.gameState.playerLost){
+      clearInterval(ch.pollInterval);
+      clearTimeout(ch.cooldownTimer);
+      document.querySelectorAll('.ch-note-btn').forEach(b=>b.disabled=true);
+      chShowThrowerStats(room.gameState, 'OPPONENT LOST');
+      const savedCode=ch.code; ch.code=null; ch.role=null; ch.myRole=null;
+      setTimeout(()=>chClear(savedCode),2000);
+      return;
+    }
+
+    // Pause sync — player paused → thrower sees waiting message, no actions
+    const isPaused = room.gameState.paused && !room.gameState.throwerPaused;
+    const pauseMsg = document.getElementById('ch-paused-msg-thrower');
+    if(isPaused){
+      pauseMsg.innerHTML=`
+        <div style="font-family:'Orbitron',sans-serif;font-size:0.9rem;font-weight:900;letter-spacing:2px;margin-bottom:8px;">GAME PAUSED</div>
+        <div style="font-size:0.68rem;opacity:0.75;">Opponent paused the game. Waiting for resume…</div>`;
+      pauseMsg.style.display='block';
+      document.querySelectorAll('.ch-note-btn').forEach(b=>b.disabled=true);
+    } else if(!room.gameState.throwerPaused){
+      pauseMsg.style.display='none';
+      if(!ch.cooldownActive) document.querySelectorAll('.ch-note-btn').forEach(b=>b.disabled=false);
+    }
+
+    // Update lives and life-lost stats
+    const lives = room.gameState.lives ?? MAX_LIVES;
+    const livesLostAt = room.gameState.livesLostAt || {};
+    chRenderThrowerLives(lives, livesLostAt);
+
+    // Update life log
+    const lostEntries = Object.entries(livesLostAt).sort((a,b)=>+a[0]-+b[0]);
+    if(lostEntries.length > 0){
+      document.getElementById('ch-life-stats').style.display='flex';
+      document.getElementById('ch-life-stats-list').innerHTML = lostEntries.map(([lifeNum, throwNum])=>`
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.68rem;">
+          <span style="color:var(--text2);">Life ${lifeNum} lost</span>
+          <span style="color:var(--accent2);">on throw #${throwNum}</span>
+        </div>`).join('');
+    }
+
+    if(room.gameState.gameOver){ clearInterval(ch.pollInterval); chHandleGameOver(room.gameState); }
+  }, 200);
+}
+
+function chRenderThrowerLives(lives, livesLostAt){
+  const el = document.getElementById('ch-thrower-lives');
+  if(!el) return;
+  el.innerHTML='';
+  // Render hearts left-to-right: slot 1 = first life (lost last), slot 3 = third life (lost first)
+  // We show hearts in order 3,2,1 so first loss appears on the right
+  for(let i=0; i<MAX_LIVES; i++){
+    const slot = MAX_LIVES - i; // slot 3,2,1
+    const lost = slot > lives;  // lives remaining: if slot > lives it's lost
+    const throwNum = livesLostAt[slot]; // throw# when this slot was lost
+    const col = document.createElement('div');
+    col.style.cssText='display:flex;flex-direction:column;align-items:center;gap:2px;';
+    const heart = document.createElement('span');
+    heart.textContent='♥';
+    heart.style.cssText=`font-size:1rem;color:${lost?'var(--accent2)':'var(--border2)'};`;
+    // Label shows only under lost hearts, displaying which throw caused the loss
+    const label = document.createElement('span');
+    label.style.cssText='font-size:0.48rem;color:var(--accent2);letter-spacing:0;min-height:10px;';
+    label.textContent = (lost && throwNum) ? `#${throwNum}` : '';
+    col.appendChild(heart);
+    col.appendChild(label);
+    el.appendChild(col);
+  }
+}
+
+function chUpdateCooldownDisplay(){
+  const seconds = (ch.cooldownMs/1000).toFixed(1);
+  document.getElementById('ch-cooldown-display').textContent = seconds+'s';
+}
+
+function chThrowNote(note, btn){
+  if(ch.cooldownActive) return;
+
+  // Write note to room
+  const room = chRead(ch.code)||{};
+  if(!room.gameState) room.gameState={notes:[],thrownCount:0,gameOver:false,score:0};
+  room.gameState.notes.push({
+    name:note, label:note, id:Date.now(),
+    color:NOTE_COLORS[note]||'#888888'
+  });
+  room.gameState.thrownCount++;
+  ch.thrownCount = room.gameState.thrownCount;
+  chWrite(ch.code, room);
+
+  // Visual feedback
+  btn.classList.add('just-thrown');
+  setTimeout(()=>btn.classList.remove('just-thrown'), 300);
+
+  document.getElementById('ch-throw-msg').textContent=`Threw ${note} →`;
+  document.getElementById('ch-thrown-count').textContent = ch.thrownCount;
+
+  // Cooldown decreases every 5 throws — based on creator's chosen initial value
+  ch.cooldownActive=true;
+  ch.cooldownMs = Math.max(500, ch.initialCooldownMs * Math.pow(0.88, Math.floor(ch.thrownCount/5)));
+  chUpdateCooldownDisplay();
+
+  // Disable all buttons during cooldown
+  document.querySelectorAll('.ch-note-btn').forEach(b=>b.disabled=true);
+
+  // Animate cooldown bar
+  const bar = document.getElementById('ch-cooldown-bar');
+  bar.style.transition='none';
+  bar.style.width='100%';
+  setTimeout(()=>{
+    bar.style.transition=`width ${ch.cooldownMs}ms linear`;
+    bar.style.width='0%';
+  }, 30);
+
+  ch.cooldownTimer = setTimeout(()=>{
+    ch.cooldownActive=false;
+    document.querySelectorAll('.ch-note-btn').forEach(b=>b.disabled=false);
+    bar.style.transition='none';
+    bar.style.width='100%';
+    document.getElementById('ch-throw-msg').textContent='Ready to throw!';
+  }, ch.cooldownMs);
+}
+
+// chThrowerTogglePause — thrower pauses via their own modal (per PDF section 3)
+function chThrowerTogglePause(){
+  const room = chRead(ch.code);
+  if(!room?.gameState) return;
+  const nowPaused = !room.gameState.throwerPaused;
+  room.gameState.throwerPaused = nowPaused;
+  room.gameState.paused = nowPaused;
+  chWrite(ch.code, room);
+
+  const modal = document.getElementById('ch-thrower-pause-modal');
+  const btn   = document.getElementById('ch-thrower-pause-btn');
+
+  if(nowPaused){
+    // Populate pause modal with latest stats
+    document.getElementById('ch-pause-thrown').textContent = ch.thrownCount || 0;
+    document.getElementById('ch-pause-lifelog').innerHTML =
+      chLifeLogHTML(room.gameState.livesLostAt);
+    modal.style.display='flex';
+    if(btn) btn.textContent='▶';
+    document.querySelectorAll('.ch-note-btn').forEach(b=>b.disabled=true);
+  } else {
+    modal.style.display='none';
+    if(btn) btn.textContent='⏸';
+    if(!ch.cooldownActive) document.querySelectorAll('.ch-note-btn').forEach(b=>b.disabled=false);
+  }
+}
+
+// ── PLAYER SCREEN ──
+function chStartPlayerScreen(){
+  document.getElementById('start-overlay').style.display='none';
+  document.getElementById('game-over-overlay').style.display='none';
+  document.getElementById('ch-opponent-left-player').style.display='none';
+  chHideAll();
+
+  state={...state,running:true,paused:false,score:0,streak:0,bestStreak:0,
+    hits:0,lives:MAX_LIVES,notes:[],particles:[],bullets:[],
+    lastSpawn:0,currentNote:null,extraLivesEarned:0,
+    gameMode:'challenge'};
+
+  document.getElementById('stats').style.display='flex';
+
+  // Same two-button controls as thrower — ⏸ pause + ⏹ exit
+  const gc=document.getElementById('game-controls');
+  gc.innerHTML=`
+    <button id="pause-btn" style="width:30px;height:30px;border-radius:6px;border:1px solid var(--border2);background:var(--panel);color:var(--text2);font-size:0.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;" onclick="togglePause()">⏸</button>
+    <button id="exit-btn" style="width:30px;height:30px;border-radius:6px;border:1px solid var(--border2);background:var(--panel);color:var(--text2);font-size:0.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;" onclick="chConfirmExit(chEndChallenge)">⏹</button>`;
+  gc.classList.add('visible');
+
+  document.getElementById('pause-overlay').innerHTML=`
+    <h1>GAME PAUSED</h1>
+    <div class="go-buttons">
+      <button class="start-btn" onclick="togglePause()">RESUME</button>
+      <button class="ghost-btn" onclick="chConfirmExit(chEndChallenge)">EXIT MATCH</button>
+    </div>`;
+
+  updateHUD();
+  startMic();
+  lastTime=performance.now();
+
+  ch.pollInterval = setInterval(()=>{
+    const room = chRead(ch.code);
+    if(!room?.gameState) return;
+
+    // Thrower left — per PDF: show "Opponent Left" with See Statistics / Exit buttons
+    if(room.gameState.throwerLeft){
+      clearInterval(ch.pollInterval);
+      state.running=false;
+      stopMic();
+      const el = document.getElementById('ch-opponent-left-player');
+      el.innerHTML=`
+        <div style="font-family:'Orbitron',sans-serif;font-size:0.9rem;font-weight:900;letter-spacing:2px;margin-bottom:10px;">OPPONENT LEFT</div>
+        <div style="font-size:0.68rem;opacity:0.75;margin-bottom:16px;">Your opponent has exited the match.</div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+          <button onclick="chShowPlayerStats('MATCH ENDED')" style="padding:8px 18px;background:var(--accent);color:#fff;border:none;font-family:'Share Tech Mono',monospace;font-size:0.68rem;cursor:pointer;border-radius:6px;">VIEW STATISTICS</button>
+          <button onclick="goToMenu()" style="padding:8px 18px;background:transparent;border:1px solid var(--border2);color:var(--text2);font-family:'Share Tech Mono',monospace;font-size:0.68rem;cursor:pointer;border-radius:6px;">EXIT</button>
+        </div>`;
+      el.style.display='block';
+      document.getElementById('game-controls').classList.remove('visible');
+      document.getElementById('stats').style.display='none';
+      return;
+    }
+
+    // Consume incoming notes
+    const incoming = room.gameState.notes;
+    if(incoming && incoming.length > 0){
+      incoming.forEach(n=>{
+        if(!state.notes.find(sn=>sn.id===n.id)){
+          const w=54,h=36;
+          const x=w+Math.random()*(canvas.width-w*2);
+          state.notes.push({
+            ...n, x, y:-h, w, h,
+            speed:getCurrentSpeed(),
+            wobble:Math.random()*Math.PI*2,
+            wobbleSpeed:0.8+Math.random()*0.8,
+            octave:false,
+          });
+        }
+      });
+      room.gameState.notes=[];
+      chWrite(ch.code, room);
+    }
+
+    // Write live state back to room for thrower to read
+    if(!room.gameState.gameOver){
+      room.gameState.score  = state.score;
+      room.gameState.lives  = state.lives;
+      // Only write player's own pause state (not thrower-initiated)
+      if(!room.gameState.throwerPaused){
+        room.gameState.paused = state.paused;
+      }
+      chWrite(ch.code, room);
+    }
+
+    // Handle thrower-initiated pause — freeze player, show waiting message
+    const throwerPaused = room.gameState.throwerPaused || false;
+    const playerPausedEl = document.getElementById('ch-opponent-left-player');
+    if(throwerPaused && state.running){
+      state.running=false;
+      playerPausedEl.className='ch-centre-msg paused';
+      playerPausedEl.innerHTML=`
+        <div style="font-family:'Orbitron',sans-serif;font-size:0.9rem;font-weight:900;letter-spacing:2px;margin-bottom:8px;">GAME PAUSED</div>
+        <div style="font-size:0.68rem;opacity:0.75;">Waiting for opponent to resume…</div>`;
+      playerPausedEl.style.display='block';
+    } else if(!throwerPaused && !state.paused && !state.running && playerPausedEl.style.display==='block' && playerPausedEl.innerHTML.includes('GAME PAUSED')){
+      playerPausedEl.style.display='none';
+      playerPausedEl.className='ch-centre-msg left';
+      state.running=true;
+      lastTime=performance.now();
+      requestAnimationFrame(gameLoop);
+    }
+  }, 150);
+
+  requestAnimationFrame(gameLoop);
+}
+
+// chEndChallenge — voluntary exit (either side)
+// Per PDF: exiting player goes straight to home; other player sees "Opponent Left" popup
+function chEndChallenge(){
+  clearInterval(ch.pollInterval);
+  clearTimeout(ch.cooldownTimer);
+  state.running=false;
+  stopMic();
+
+  // Flag who left — keep room alive for 4s so other tab's poll can read it
+  const room = chRead(ch.code);
+  const myCode = ch.code;
+  const myRole = ch.myRole;
+  if(room){
+    if(!room.gameState) room.gameState={notes:[],thrownCount:0,gameOver:false,score:0,paused:false,playerLeft:false,throwerLeft:false,livesLostAt:{}};
+    if(myRole==='player') room.gameState.playerLeft=true;
+    else room.gameState.throwerLeft=true;
+    room.gameState.gameOver=true;
+    chWrite(myCode, room);
+  }
+  setTimeout(()=>chClear(myCode), 4000);
+
+  // Per PDF: the exiting player goes directly to home, no stats shown
+  ch.code=null; ch.role=null; ch.myRole=null;
+  chRestoreUI();
+  goToMenu();
+}
+
+// chHandleGameOver replaced by chShowThrowerStats
+
+// ─────────────────────────────────────────────
+//  CHALLENGE SHARED HELPERS
+// ─────────────────────────────────────────────
+
+function chLifeLogHTML(livesLostAt){
+  const ordinals = {3:'1st life', 2:'2nd life', 1:'3rd life'};
+  const rows = [3,2,1].map(slot=>{
+    const t = (livesLostAt||{})[slot];
+    return (t!=null) ? {label:ordinals[slot], throw:t} : null;
+  }).filter(Boolean);
+  if(rows.length===0) return '<div style="color:var(--text3);font-size:0.72rem;text-align:center;padding:14px 0;">No lives lost.</div>';
+  return rows.map(r=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 4px;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.76rem;color:var(--text2);">${r.label}</span>
+      <span style="font-family:'Orbitron',sans-serif;font-size:0.82rem;color:var(--accent2);font-weight:700;">throw #${r.throw}</span>
+    </div>`).join('');
+}
+
+function chRestoreUI(){
+  chHideAll();
+  const throwerEl = document.getElementById('ch-opponent-left-thrower');
+  const playerEl  = document.getElementById('ch-opponent-left-player');
+  if(throwerEl){ throwerEl.style.display='none'; throwerEl.innerHTML=''; }
+  if(playerEl) { playerEl.style.display='none';  playerEl.innerHTML=''; playerEl.className='ch-centre-msg left'; }
+  const pmsg = document.getElementById('ch-paused-msg-thrower');
+  if(pmsg) pmsg.style.display='none';
+  const tModal = document.getElementById('ch-thrower-pause-modal');
+  if(tModal) tModal.style.display='none';
+  document.getElementById('game-controls').innerHTML=`
+    <button id="pause-btn" onclick="togglePause()">⏸</button>
+    <button id="exit-btn" onclick="exitToHome()">⏹</button>`;
+  document.getElementById('game-controls').classList.remove('visible');
+  document.getElementById('stats').style.display='none';
+  document.getElementById('pause-overlay').style.display='none';
+  document.getElementById('pause-overlay').innerHTML=`
+    <h1>PAUSED</h1>
+    <div class="go-buttons">
+      <button class="start-btn" onclick="togglePause()">RESUME</button>
+      <button class="ghost-btn" onclick="exitToHome()">EXIT TO MENU</button>
+    </div>`;
+}
+
+// Show the thrower stats screen (used for game over AND opponent-left "See Statistics")
+function chShowThrowerStats(gameState, heading){
+  chRestoreUI();
+  const totalThrown = (gameState&&gameState.thrownCount)||ch.thrownCount||0;
+  const goEl = document.getElementById('game-over-overlay');
+  goEl.innerHTML=`
+    <h1>${heading}</h1>
+    <div style="font-family:'Orbitron',sans-serif;font-size:2.8rem;font-weight:900;color:var(--accent);">${totalThrown}</div>
+    <div style="font-size:0.55rem;color:var(--text3);letter-spacing:3px;text-transform:uppercase;margin-top:-6px;margin-bottom:10px;">Total Notes Thrown</div>
+    <div style="width:100%;max-width:300px;">
+      <div style="font-size:0.52rem;color:var(--text3);letter-spacing:3px;text-transform:uppercase;margin-bottom:6px;text-align:center;">Opponent Life Log</div>
+      ${chLifeLogHTML(gameState&&gameState.livesLostAt)}
+    </div>
+    <div class="go-buttons" style="margin-top:14px;">
+      <button class="ghost-btn" onclick="goToMenu()">← BACK TO HOME</button>
+    </div>`;
+  goEl.style.display='flex';
+}
+
+// Show the player stats screen (used for player natural loss AND thrower-left "See Statistics")
+function chShowPlayerStats(heading){
+  chRestoreUI();
+  const goEl = document.getElementById('game-over-overlay');
+  goEl.innerHTML=`
+    <h1>${heading}</h1>
+    <div style="font-family:'Orbitron',sans-serif;font-size:2.8rem;font-weight:900;color:var(--accent);">${state.score}</div>
+    <div style="font-size:0.55rem;color:var(--text3);letter-spacing:3px;text-transform:uppercase;margin-top:-6px;margin-bottom:10px;">Final Score</div>
+    <div style="width:100%;max-width:300px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px;border-bottom:1px solid var(--border);">
+        <span style="font-size:0.76rem;color:var(--text2);">Notes Hit</span>
+        <span style="font-family:'Orbitron',sans-serif;font-size:0.82rem;color:var(--accent);font-weight:700;">${state.hits}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px;border-bottom:1px solid var(--border);">
+        <span style="font-size:0.76rem;color:var(--text2);">Best Streak</span>
+        <span style="font-family:'Orbitron',sans-serif;font-size:0.82rem;color:var(--accent);font-weight:700;">${state.bestStreak}</span>
+      </div>
+    </div>
+    <div class="go-buttons" style="margin-top:14px;">
+      <button class="ghost-btn" onclick="goToMenu()">← BACK TO HOME</button>
+    </div>`;
+  goEl.style.display='flex';
+}
+
+// Exit confirmation dialog — prevents accidental exits
+function chConfirmExit(onConfirm){
+  const existing = document.getElementById('ch-exit-confirm');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id='ch-exit-confirm';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:300;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML=`
+    <div style="background:var(--panel);border:1px solid var(--border2);border-radius:10px;padding:28px 32px;text-align:center;max-width:320px;display:flex;flex-direction:column;gap:14px;">
+      <div style="font-family:'Orbitron',sans-serif;font-size:0.85rem;font-weight:900;color:var(--text);letter-spacing:2px;">EXIT MATCH?</div>
+      <div style="font-size:0.72rem;color:var(--text3);line-height:1.7;">Are you sure you want to leave the game?</div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button class="ghost-btn" onclick="document.getElementById('ch-exit-confirm').remove()">CANCEL</button>
+        <button class="start-btn" style="padding:9px 24px;font-size:0.76rem;" onclick="document.getElementById('ch-exit-confirm').remove();(${onConfirm.toString()})();">CONFIRM EXIT</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function chCancel(){
+  clearInterval(ch.pollInterval);
+  if(ch.code) chClear(ch.code);
+  ch.code=null; ch.role=null; ch.myRole=null;
+  switchToMode('classic');
+  goToMenu();
+}
+
+// ─────────────────────────────────────────────
+//  EVENTS
+// ─────────────────────────────────────────────
+document.querySelectorAll('.mode-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');state.gameMode=btn.dataset.mode;
+    document.getElementById('scale-picker').style.display=state.gameMode==='scale'?'flex':'none';
+    // Show challenge lobby inline
+    const lobby=document.getElementById('ch-lobby');
+    if(state.gameMode==='challenge'){lobby.style.display='flex';}
+    else{lobby.style.display='none';}
+  });
+});
+function switchToMode(mode){
+  state.gameMode=mode;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('selected',b.dataset.mode===mode));
+  document.getElementById('scale-picker').style.display='none';
+  document.getElementById('ch-lobby').style.display='none';
+  chHideAll();
+  document.getElementById('start-overlay').style.display='flex';
+}
+document.querySelectorAll('.diff-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');state.difficulty=btn.dataset.diff;
+  });
+});
+document.getElementById('start-btn').addEventListener('click',startGame);
+document.getElementById('restart-btn').addEventListener('click',startGame);
+document.getElementById('menu-btn').addEventListener('click',goToMenu);
+
+// Scale picker build
+function updateScalePreview(){
+  document.getElementById('scale-preview-notes').textContent=currentScaleNotes().join('  ·  ');
+  document.getElementById('scale-preview-name').textContent=`${scaleState.root} ${scaleState.type} — ${SCALE_TYPES[scaleState.type]?.desc||''}`;
+}
+const rootRow=document.getElementById('root-note-row');
+ROOT_NOTES.forEach(r=>{
+  const btn=document.createElement('button');
+  btn.className='root-btn'+(r===scaleState.root?' selected':'');
+  btn.textContent=r;
+  btn.addEventListener('click',()=>{
+    scaleState.root=r;
+    document.querySelectorAll('.root-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');updateScalePreview();
+  });
+  rootRow.appendChild(btn);
+});
+const typeRow=document.getElementById('scale-type-row');
+Object.keys(SCALE_TYPES).forEach(t=>{
+  const btn=document.createElement('button');
+  btn.className='scale-type-btn'+(t===scaleState.type?' selected':'');
+  btn.textContent=t;
+  btn.addEventListener('click',()=>{
+    scaleState.type=t;
+    document.querySelectorAll('.scale-type-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');updateScalePreview();
+  });
+  typeRow.appendChild(btn);
+});
+updateScalePreview();
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+loadTheme();
+loadSession();
+resizeCanvases();
+updateHUD();
+drawFretboard();
+renderLeaderboard();
+</script>
+</body>
+</html>
