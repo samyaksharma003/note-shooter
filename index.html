@@ -1572,16 +1572,8 @@ function hitNote(note){
 function missNote(note){
   state.notes=state.notes.filter(n=>n!==note);
   state.streak=0;state.lives--;soundMiss();updateHUD();screenFlash();
-  // In challenge mode, record which throw caused this life loss
   if(state.gameMode==='challenge' && ch.code){
-    const room=chRead(ch.code);
-    if(room?.gameState){
-      room.gameState.livesLostAt = room.gameState.livesLostAt||{};
-      // slot = the life number that was just lost (3 = first loss, 2 = second, 1 = third)
-      const slot = state.lives + 1;
-      room.gameState.livesLostAt[slot] = room.gameState.thrownCount||0;
-      chWrite(ch.code,room);
-    }
+    firebase.database().ref('rooms/'+ch.code+'/gameState/livesLostAt/'+( state.lives+1)).set(ch._cache?.gameState?.thrownCount||0);
   }
   if(state.lives<=0)endGame();
 }
@@ -2297,10 +2289,12 @@ function chStartThrowerScreen(){
     sheet.appendChild(btn);
   });
 
-  // Write initial game state
-  const room = chRead(ch.code)||{};
-  room.gameState = { notes:[], thrownCount:0, gameOver:false, score:0, paused:false, playerLeft:false, livesLostAt:{} };
-  chWrite(ch.code, room);
+  // Write initial game state directly to Firebase path — don't overwrite whole room
+  firebase.database().ref('rooms/'+ch.code+'/gameState').set({
+    notes:[], thrownCount:0, gameOver:false, score:0,
+    paused:false, playerLeft:false, throwerLeft:false,
+    playerLost:false, livesLostAt:{}
+  });
 
   chStartListener(ch.code, room=>{
     if(!room?.gameState) return;
@@ -2402,46 +2396,34 @@ function chUpdateCooldownDisplay(){
 function chThrowNote(note, btn){
   if(ch.cooldownActive) return;
 
-  // Write note to room
-  const room = chRead(ch.code)||{};
-  if(!room.gameState) room.gameState={notes:[],thrownCount:0,gameOver:false,score:0};
-  room.gameState.notes.push({
-    name:note, label:note, id:Date.now(),
-    color:NOTE_COLORS[note]||'#888888'
-  });
-  room.gameState.thrownCount++;
-  ch.thrownCount = room.gameState.thrownCount;
-  chWrite(ch.code, room);
+  // Push note directly to Firebase notes list — no read needed
+  const noteData = { name:note, label:note, id:Date.now(), color:NOTE_COLORS[note]||'#888888' };
+  firebase.database().ref('rooms/'+ch.code+'/gameState/notes').push(noteData);
+
+  // Increment thrown count atomically
+  ch.thrownCount++;
+  firebase.database().ref('rooms/'+ch.code+'/gameState/thrownCount').set(ch.thrownCount);
 
   // Visual feedback
   btn.classList.add('just-thrown');
   setTimeout(()=>btn.classList.remove('just-thrown'), 300);
-
   document.getElementById('ch-throw-msg').textContent=`Threw ${note} →`;
   document.getElementById('ch-thrown-count').textContent = ch.thrownCount;
 
-  // Cooldown decreases every 5 throws — based on creator's chosen initial value
+  // Cooldown
   ch.cooldownActive=true;
   ch.cooldownMs = Math.max(500, ch.initialCooldownMs * Math.pow(0.88, Math.floor(ch.thrownCount/5)));
   chUpdateCooldownDisplay();
-
-  // Disable all buttons during cooldown
   document.querySelectorAll('.ch-note-btn').forEach(b=>b.disabled=true);
 
-  // Animate cooldown bar
   const bar = document.getElementById('ch-cooldown-bar');
-  bar.style.transition='none';
-  bar.style.width='100%';
-  setTimeout(()=>{
-    bar.style.transition=`width ${ch.cooldownMs}ms linear`;
-    bar.style.width='0%';
-  }, 30);
+  bar.style.transition='none'; bar.style.width='100%';
+  setTimeout(()=>{ bar.style.transition=`width ${ch.cooldownMs}ms linear`; bar.style.width='0%'; }, 30);
 
   ch.cooldownTimer = setTimeout(()=>{
     ch.cooldownActive=false;
     document.querySelectorAll('.ch-note-btn').forEach(b=>b.disabled=false);
-    bar.style.transition='none';
-    bar.style.width='100%';
+    bar.style.transition='none'; bar.style.width='100%';
     document.getElementById('ch-throw-msg').textContent='Ready to throw!';
   }, ch.cooldownMs);
 }
@@ -2526,9 +2508,10 @@ function chStartPlayerScreen(){
       return;
     }
 
-    // Consume incoming notes
-    const incoming = room.gameState.notes;
-    if(incoming && incoming.length > 0){
+    // Consume incoming notes — Firebase push() gives object with auto-keys, not array
+    const notesObj = room.gameState.notes;
+    if(notesObj && typeof notesObj === 'object'){
+      const incoming = Object.values(notesObj);
       incoming.forEach(n=>{
         if(!state.notes.find(sn=>sn.id===n.id)){
           const w=54,h=36;
@@ -2542,19 +2525,17 @@ function chStartPlayerScreen(){
           });
         }
       });
-      room.gameState.notes=[];
-      chWrite(ch.code, room);
+      // Clear consumed notes
+      firebase.database().ref('rooms/'+ch.code+'/gameState/notes').remove();
     }
 
-    // Write live state back to room for thrower to read
+    // Write live state back to Firebase for thrower to read
     if(!room.gameState.gameOver){
-      room.gameState.score  = state.score;
-      room.gameState.lives  = state.lives;
-      // Only write player's own pause state (not thrower-initiated)
+      firebase.database().ref('rooms/'+ch.code+'/gameState/score').set(state.score);
+      firebase.database().ref('rooms/'+ch.code+'/gameState/lives').set(state.lives);
       if(!room.gameState.throwerPaused){
-        room.gameState.paused = state.paused;
+        firebase.database().ref('rooms/'+ch.code+'/gameState/paused').set(state.paused);
       }
-      chWrite(ch.code, room);
     }
 
     // Handle thrower-initiated pause — freeze player, show waiting message
