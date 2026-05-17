@@ -2080,30 +2080,40 @@ function chPollCreator(room){
 // ── JOIN ──
 function chJoin(){
   const code = document.getElementById('ch-join-input').value.trim().toUpperCase();
-  if(code.length !== 6){ document.getElementById('ch-join-msg').textContent='Enter a 6-character code.'; return; }
-  const room = chRead(code);
-  if(!room){ document.getElementById('ch-join-msg').textContent='Room not found. Check the code.'; return; }
-  if(room.joiner !== null){ document.getElementById('ch-join-msg').textContent='Room is already full.'; return; }
+  const msg = document.getElementById('ch-join-msg');
+  if(code.length !== 6){ msg.textContent='Enter a 6-character code.'; return; }
 
-  ch.code = code;
-  ch.role = 'joiner';
-  ch.myRole = null;
+  msg.textContent='Looking up room...';
 
-  // Write joiner in
-  room.joiner = { role:null, ready:false };
-  chWrite(code, room);
+  // Read directly from Firebase (async)
+  firebase.database().ref('rooms/'+code).once('value').then(snap=>{
+    const room = snap.val();
+    if(!room){ msg.textContent='Room not found. Check the code.'; return; }
+    if(room.joiner !== null){ msg.textContent='Room is already full.'; return; }
 
-  chHideAll();
-  document.getElementById('ch-joiner-room').style.display='flex';
-  document.getElementById('ch-joined-code').textContent = code;
-  document.getElementById('ch-joiner-ready-cb').checked=false;
-  document.getElementById('ch-joiner-ready-cb').disabled=true;
-  document.getElementById('ch-joiner-role-thrower').classList.remove('selected','conflict');
-  document.getElementById('ch-joiner-role-player').classList.remove('selected','conflict');
-  document.getElementById('ch-joiner-conflict-msg').textContent='';
-  document.getElementById('ch-creator-ready-display').textContent='';
+    ch.code = code;
+    ch.role = 'joiner';
+    ch.myRole = null;
 
-  chStartListener(ch.code, room=>{ if(room) chPollJoiner(room); });
+    // Write joiner in
+    room.joiner = { role:null, ready:false };
+    chWrite(code, room);
+
+    chHideAll();
+    document.getElementById('ch-joiner-room').style.display='flex';
+    document.getElementById('ch-joined-code').textContent = code;
+    document.getElementById('ch-joiner-ready-cb').checked=false;
+    document.getElementById('ch-joiner-ready-cb').disabled=true;
+    document.getElementById('ch-joiner-role-thrower').classList.remove('selected','conflict');
+    document.getElementById('ch-joiner-role-player').classList.remove('selected','conflict');
+    document.getElementById('ch-joiner-conflict-msg').textContent='';
+    document.getElementById('ch-creator-ready-display').textContent='';
+
+    chStartListener(ch.code, room=>{ if(room) chPollJoiner(room); });
+  }).catch(err=>{
+    msg.textContent='Error connecting. Check your internet.';
+    console.error(err);
+  });
 }
 
 function chPollJoiner(room){
@@ -2144,12 +2154,9 @@ function chSetRole(who, role){
   document.getElementById(prefix+'-thrower').classList.toggle('selected', role==='thrower');
   document.getElementById(prefix+'-player').classList.toggle('selected', role==='player');
 
-  // Write to room
-  const room = chRead(ch.code);
-  if(!room) return;
-  if(who==='creator') room.creator.role = role;
-  else room.joiner.role = role;
-  chWrite(ch.code, room);
+  // Update Firebase directly
+  const path = who==='creator' ? 'creator/role' : 'joiner/role';
+  if(ch.code) firebase.database().ref('rooms/'+ch.code+'/'+path).set(role);
 }
 
 // ── COUNTDOWN ──
@@ -2194,14 +2201,14 @@ function chUpdateCountdownUI(){
 }
 
 function chReadyChange(){
-  const room = chRead(ch.code);
-  if(!room) return;
   const myReady = ch.role==='creator'
     ? document.getElementById('ch-creator-ready-cb').checked
     : document.getElementById('ch-joiner-ready-cb').checked;
-  if(ch.role==='creator') room.creator.ready = myReady;
-  else room.joiner.ready = myReady;
-  chWrite(ch.code, room);
+
+  // Write directly to Firebase
+  const path = ch.role==='creator' ? 'creator/ready' : 'joiner/ready';
+  if(ch.code) firebase.database().ref('rooms/'+ch.code+'/'+path).set(myReady);
+
   if(!myReady && chCountdownInterval){
     chClearCountdown();
     chCountdownValue = 0;
