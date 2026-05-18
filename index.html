@@ -1185,6 +1185,7 @@ function refreshAccountPanel(){
     // Always fetch fresh stats from Firebase
     firebase.database().ref('users/'+currentUser.uid+'/stats').once('value').then(snap=>{
       const s = snap.val()||{};
+      console.log('[USER] stats from Firebase:', JSON.stringify(s));
       document.getElementById('sb-stat-games').textContent  = s.games||0;
       document.getElementById('sb-stat-best').textContent   = s.bestScore||0;
       document.getElementById('sb-stat-streak').textContent = s.bestStreak||0;
@@ -1213,6 +1214,7 @@ function refreshDashboardPanel(){
   // Load history from Firebase
   firebase.database().ref('users/'+uid+'/history').once('value').then(snap=>{
     const histObj=snap.val()||{};
+    console.log('[USER] history from Firebase:', JSON.stringify(histObj));
     const history=Object.values(histObj).sort((a,b)=>b.date-a.date).slice(0,20);
     if(history.length===0){
       histEl.innerHTML='<div class="not-logged-msg">No games played yet.</div>';
@@ -1248,7 +1250,8 @@ function refreshDashboardPanel(){
 }
 
 function saveGameResult(score,hits,bestStreak,difficulty,mode){
-  if(!currentUser) return [];
+  console.log('[USER] saveGameResult called, user:', currentUser?.uid, 'score:', score);
+  if(!currentUser) { console.log('[USER] no user logged in, skipping save'); return []; }
   const uid = currentUser.uid;
   const userRef = firebase.database().ref('users/'+uid);
 
