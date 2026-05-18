@@ -7,6 +7,7 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
   firebase.initializeApp({
     apiKey: "AIzaSyCFmozMC3QgKrUaEGF70wmlka7zKwhcc_0",
@@ -486,7 +487,7 @@ canvas#gameCanvas { position:absolute; top:0; left:0; width:100%; height:100%; }
           <span class="nav-icon">?</span> Help
         </div>
       </nav>
-      <div id="sidebar-footer">v1.0 · Local storage</div>
+      <div id="sidebar-footer">v1.0 · Note Shooter</div>
     </div>
   </div>
 
@@ -506,27 +507,30 @@ canvas#gameCanvas { position:absolute; top:0; left:0; width:100%; height:100%; }
 
         <!-- not logged in -->
         <div id="sb-auth-section">
-          <input class="sb-auth-input" type="text" id="sb-username" placeholder="Username" maxlength="20" autocomplete="off"/>
-          <input class="sb-auth-input" type="password" id="sb-password" placeholder="Password" maxlength="40"/>
-          <div class="auth-msg" id="sb-auth-msg"></div>
-          <div style="display:flex;gap:8px;">
-            <button class="sb-btn" onclick="sbLogin()">LOGIN</button>
-            <button class="sb-btn outline" onclick="sbSignup()">SIGN UP</button>
-          </div>
-          <p style="font-size:0.62rem;color:var(--text3);margin-top:10px;line-height:1.7;">Accounts are stored locally on this browser.</p>
+          <p style="font-size:0.75rem;color:var(--text2);line-height:1.8;margin-bottom:16px;">Sign in to save your progress, track achievements and access your history across all devices.</p>
+          <button onclick="signInWithGoogle()" id="google-signin-btn" style="width:100%;padding:12px;background:var(--panel2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:0.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all 0.15s;">
+            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+            Continue with Google
+          </button>
+          <div id="sb-auth-msg" class="auth-msg" style="margin-top:10px;text-align:center;"></div>
         </div>
 
         <!-- logged in -->
         <div id="sb-profile-section" style="display:none;">
-          <div class="sb-profile-name" id="sb-profile-name"></div>
-          <div class="sb-profile-email" id="sb-profile-joined"></div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <img id="sb-profile-photo" src="" width="40" height="40" style="border-radius:50%;display:none;border:2px solid var(--border2);"/>
+            <div>
+              <div class="sb-profile-name" id="sb-profile-name"></div>
+              <div class="sb-profile-email" id="sb-profile-joined"></div>
+            </div>
+          </div>
           <div class="sb-stat-grid">
             <div class="sb-stat-box"><span class="ps-label">Games</span><div class="ps-value" id="sb-stat-games">0</div></div>
             <div class="sb-stat-box"><span class="ps-label">Best Score</span><div class="ps-value" id="sb-stat-best">0</div></div>
             <div class="sb-stat-box"><span class="ps-label">Best Streak</span><div class="ps-value" id="sb-stat-streak">0</div></div>
             <div class="sb-stat-box"><span class="ps-label">Total Hits</span><div class="ps-value" id="sb-stat-hits">0</div></div>
           </div>
-          <button class="sb-btn danger" onclick="sbLogout()">LOGOUT</button>
+          <button class="sb-btn danger" onclick="signOutGoogle()" style="margin-top:14px;">SIGN OUT</button>
         </div>
       </div>
 
@@ -1111,157 +1115,188 @@ function switchSbTab(tab){
 }
 
 // ─────────────────────────────────────────────
-//  ACCOUNT SYSTEM
+//  ACCOUNT SYSTEM — Firebase Auth + Google Login
 // ─────────────────────────────────────────────
-let currentUser=null;
-function getUsers(){try{return JSON.parse(localStorage.getItem('gs_users')||'{}');}catch{return {};}}
-function saveUsers(u){localStorage.setItem('gs_users',JSON.stringify(u));}
-function loadSession(){
-  const u=localStorage.getItem('gs_session');
-  if(!u)return;
-  const users=getUsers();
-  if(users[u]){currentUser=u;updateSidebarUserInfo();}
+let currentUser = null; // Firebase user object
+
+// Google Sign In
+function signInWithGoogle(){
+  const provider = new firebase.auth.GoogleAuthProvider();
+  firebase.auth().signInWithPopup(provider).catch(err=>{
+    const msg = document.getElementById('sb-auth-msg');
+    msg.className='auth-msg error';
+    msg.textContent = 'Sign in failed. Please try again.';
+    console.error(err);
+  });
 }
 
-function sbSignup(){
-  const username=document.getElementById('sb-username').value.trim();
-  const password=document.getElementById('sb-password').value;
-  const msg=document.getElementById('sb-auth-msg');
-  if(username.length<3){msg.className='auth-msg error';msg.textContent='Username needs 3+ characters.';return;}
-  if(password.length<4){msg.className='auth-msg error';msg.textContent='Password needs 4+ characters.';return;}
-  const users=getUsers();
-  if(users[username]){msg.className='auth-msg error';msg.textContent='Username taken.';return;}
-  users[username]={password,created:Date.now(),stats:{games:0,bestScore:0,bestStreak:0,totalHits:0,diffCounts:{},practiceNotes:0},history:[],achievements:[]};
-  saveUsers(users);
-  msg.className='auth-msg success';msg.textContent='Account created!';
-  setTimeout(()=>loginAs(username),600);
+function signOutGoogle(){
+  firebase.auth().signOut();
 }
 
-function sbLogin(){
-  const username=document.getElementById('sb-username').value.trim();
-  const password=document.getElementById('sb-password').value;
-  const msg=document.getElementById('sb-auth-msg');
-  const users=getUsers();
-  if(!users[username]){msg.className='auth-msg error';msg.textContent='Username not found.';return;}
-  if(users[username].password!==password){msg.className='auth-msg error';msg.textContent='Wrong password.';return;}
-  msg.className='auth-msg success';msg.textContent='Welcome back!';
-  setTimeout(()=>loginAs(username),400);
-}
-
-function loginAs(username){
-  currentUser=username;
-  localStorage.setItem('gs_session',username);
+// Listen for auth state changes — fires on login, logout, and page load
+firebase.auth().onAuthStateChanged(user=>{
+  currentUser = user;
   updateSidebarUserInfo();
   refreshAccountPanel();
-}
-
-function sbLogout(){
-  currentUser=null;
-  localStorage.removeItem('gs_session');
-  updateSidebarUserInfo();
-  refreshAccountPanel();
-}
+  if(user){
+    // Ensure user profile exists in Firebase DB
+    const userRef = firebase.database().ref('users/'+user.uid);
+    userRef.once('value').then(snap=>{
+      if(!snap.val()){
+        userRef.set({
+          name: user.displayName,
+          email: user.email,
+          photo: user.photoURL||'',
+          created: Date.now(),
+          stats:{games:0,bestScore:0,bestStreak:0,totalHits:0,diffCounts:{},practiceNotes:0},
+          history:[],
+          achievements:[]
+        });
+      }
+    });
+  }
+});
 
 function updateSidebarUserInfo(){
-  document.getElementById('sidebar-user-info').textContent=currentUser?currentUser:'Not logged in';
+  const el = document.getElementById('sidebar-user-info');
+  el.textContent = currentUser ? (currentUser.displayName||currentUser.email) : 'Not logged in';
 }
 
 function refreshAccountPanel(){
-  const authSection=document.getElementById('sb-auth-section');
-  const profileSection=document.getElementById('sb-profile-section');
+  const authSection = document.getElementById('sb-auth-section');
+  const profileSection = document.getElementById('sb-profile-section');
+  if(!authSection||!profileSection) return;
+
   if(currentUser){
     authSection.style.display='none';
     profileSection.style.display='block';
-    const u=getUsers()[currentUser];
-    document.getElementById('sb-profile-name').textContent=currentUser;
-    document.getElementById('sb-profile-joined').textContent=`Member since ${new Date(u.created).toLocaleDateString()}`;
-    document.getElementById('sb-stat-games').textContent=u.stats.games;
-    document.getElementById('sb-stat-best').textContent=u.stats.bestScore;
-    document.getElementById('sb-stat-streak').textContent=u.stats.bestStreak;
-    document.getElementById('sb-stat-hits').textContent=u.stats.totalHits;
+    document.getElementById('sb-profile-name').textContent = currentUser.displayName||'User';
+    document.getElementById('sb-profile-joined').textContent = currentUser.email||'';
+    // Show profile photo if available
+    const photo = document.getElementById('sb-profile-photo');
+    if(currentUser.photoURL){ photo.src=currentUser.photoURL; photo.style.display='block'; }
+    else photo.style.display='none';
+    // Load stats from Firebase
+    firebase.database().ref('users/'+currentUser.uid+'/stats').once('value').then(snap=>{
+      const s = snap.val()||{};
+      document.getElementById('sb-stat-games').textContent  = s.games||0;
+      document.getElementById('sb-stat-best').textContent   = s.bestScore||0;
+      document.getElementById('sb-stat-streak').textContent = s.bestStreak||0;
+      document.getElementById('sb-stat-hits').textContent   = s.totalHits||0;
+    });
   } else {
     authSection.style.display='block';
     profileSection.style.display='none';
-    document.getElementById('sb-auth-msg').textContent='';
+    const msg = document.getElementById('sb-auth-msg');
+    if(msg) msg.textContent='';
   }
 }
 
+// Keep loadSession as no-op — Firebase handles session automatically
+function loadSession(){}
+
 function refreshDashboardPanel(){
-  // History
   const histEl=document.getElementById('sb-history-content');
+  const achEl=document.getElementById('sb-ach-list');
   if(!currentUser){
     histEl.innerHTML='<div class="not-logged-msg">Log in to see your history.</div>';
-    document.getElementById('sb-ach-list').innerHTML='<div class="not-logged-msg">Log in to track achievements.</div>';
+    achEl.innerHTML='<div class="not-logged-msg">Log in to track achievements.</div>';
     return;
   }
-  const u=getUsers()[currentUser];
-  const history=u.history||[];
-  if(history.length===0){
-    histEl.innerHTML='<div class="not-logged-msg">No games played yet.</div>';
-  } else {
-    histEl.innerHTML=history.slice(0,20).map(h=>`
-      <div class="sb-history-item">
-        <div class="hi-left">
-          <div class="hi-diff ${h.difficulty}">${h.difficulty.toUpperCase()}${h.mode==='timer'?' · TIMER':h.mode==='scale'?' · SCALE':h.mode==='practice'?' · PRACTICE':''}</div>
-          <div class="hi-date">${new Date(h.date).toLocaleDateString()} ${new Date(h.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+  const uid=currentUser.uid;
+  // Load history from Firebase
+  firebase.database().ref('users/'+uid+'/history').once('value').then(snap=>{
+    const histObj=snap.val()||{};
+    const history=Object.values(histObj).sort((a,b)=>b.date-a.date).slice(0,20);
+    if(history.length===0){
+      histEl.innerHTML='<div class="not-logged-msg">No games played yet.</div>';
+    } else {
+      histEl.innerHTML=history.map(h=>`
+        <div class="sb-history-item">
+          <div class="hi-left">
+            <div class="hi-diff ${h.difficulty}">${h.difficulty.toUpperCase()}${h.mode==='timer'?' · TIMER':h.mode==='scale'?' · SCALE':h.mode==='practice'?' · PRACTICE':''}</div>
+            <div class="hi-date">${new Date(h.date).toLocaleDateString()} ${new Date(h.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+          </div>
+          <div class="hi-right">
+            <div class="hi-score">${h.score}</div>
+            <div class="hi-meta">${h.hits} hits · ${h.streak} streak</div>
+          </div>
+        </div>`).join('');
+    }
+  });
+  // Load achievements from Firebase
+  firebase.database().ref('users/'+uid+'/achievements').once('value').then(snap=>{
+    const unlocked=snap.val()||[];
+    achEl.innerHTML=ACHIEVEMENTS.map(a=>{
+      const ok=Array.isArray(unlocked)?unlocked.includes(a.id):Object.values(unlocked).includes(a.id);
+      return `<div class="ach-item ${ok?'unlocked':'locked'}">
+        <div class="ach-item-icon">${a.icon}</div>
+        <div class="ach-item-body">
+          <div class="ach-item-name">${a.name}</div>
+          <div class="ach-item-desc">${a.desc}</div>
         </div>
-        <div class="hi-right">
-          <div class="hi-score">${h.score}</div>
-          <div class="hi-meta">${h.hits} hits · ${h.streak} streak</div>
-        </div>
-      </div>`).join('');
-  }
-  // Achievements
-  const unlocked=u.achievements||[];
-  document.getElementById('sb-ach-list').innerHTML=ACHIEVEMENTS.map(a=>{
-    const ok=unlocked.includes(a.id);
-    return `<div class="ach-item ${ok?'unlocked':'locked'}">
-      <div class="ach-item-icon">${a.icon}</div>
-      <div class="ach-item-body">
-        <div class="ach-item-name">${a.name}</div>
-        <div class="ach-item-desc">${a.desc}</div>
-      </div>
-      <div class="ach-item-badge">${ok?'DONE':'LOCKED'}</div>
-    </div>`;
-  }).join('');
+        <div class="ach-item-badge">${ok?'DONE':'LOCKED'}</div>
+      </div>`;
+    }).join('');
+  });
 }
 
 function saveGameResult(score,hits,bestStreak,difficulty,mode){
-  if(!currentUser)return[];
-  const users=getUsers();const u=users[currentUser];
-  u.stats.games++;
-  if(score>u.stats.bestScore)u.stats.bestScore=score;
-  if(bestStreak>u.stats.bestStreak)u.stats.bestStreak=bestStreak;
-  u.stats.totalHits+=hits;
-  u.stats.diffCounts[difficulty]=(u.stats.diffCounts[difficulty]||0)+1;
-  u.history.unshift({date:Date.now(),score,hits,streak:bestStreak,difficulty,mode});
-  if(u.history.length>30)u.history=u.history.slice(0,30);
-  const prev=[...u.achievements];
-  checkAchievements(u);
-  const newAch=u.achievements.filter(a=>!prev.includes(a));
-  saveUsers(users);
-  return newAch;
+  if(!currentUser) return [];
+  const uid = currentUser.uid;
+  const userRef = firebase.database().ref('users/'+uid);
+
+  // Read current stats, update, write back
+  userRef.once('value').then(snap=>{
+    const u = snap.val()||{stats:{games:0,bestScore:0,bestStreak:0,totalHits:0,diffCounts:{},practiceNotes:0},history:[],achievements:[]};
+    if(!u.stats) u.stats={games:0,bestScore:0,bestStreak:0,totalHits:0,diffCounts:{},practiceNotes:0};
+    if(!u.achievements) u.achievements=[];
+
+    u.stats.games++;
+    if(score>u.stats.bestScore) u.stats.bestScore=score;
+    if(bestStreak>u.stats.bestStreak) u.stats.bestStreak=bestStreak;
+    u.stats.totalHits+=hits;
+    u.stats.diffCounts[difficulty]=(u.stats.diffCounts[difficulty]||0)+1;
+
+    // Write history entry
+    firebase.database().ref('users/'+uid+'/history').push({date:Date.now(),score,hits,streak:bestStreak,difficulty,mode});
+
+    // Check and update achievements
+    const prev=[...u.achievements];
+    const newAchs=getNewAchievements(u.stats,u.achievements);
+    newAchs.forEach(id=>{ if(!u.achievements.includes(id)) u.achievements.push(id); });
+
+    // Write stats and achievements back
+    userRef.update({stats:u.stats, achievements:u.achievements});
+  });
+  return []; // achievements returned async — handled via refreshAccountPanel
 }
 
-function checkAchievements(u){
-  const g=(id)=>{if(!u.achievements.includes(id))u.achievements.push(id);};
-  if(u.stats.games>=1)g('first_game');
-  if(u.stats.bestScore>=100)g('score_100');
-  if(u.stats.bestScore>=500)g('score_500');
-  if(u.stats.bestScore>=1000)g('score_1000');
-  if(u.stats.bestStreak>=5)g('streak_5');
-  if(u.stats.bestStreak>=10)g('streak_10');
-  if(u.stats.bestStreak>=20)g('streak_20');
-  if(u.stats.bestStreak>=50)g('streak_50');
-  if((u.stats.diffCounts['shredder']||0)>=1)g('play_shredder');
-  if(u.stats.games>=5)g('play_5');
-  if(u.stats.games>=20)g('play_20');
-  if(u.stats.totalHits>=50)g('hits_50');
-  if(u.stats.totalHits>=200)g('hits_200');
+function getNewAchievements(stats, existing){
+  const newOnes=[];
+  const g=(id)=>{ if(!existing.includes(id)) newOnes.push(id); };
+  if(stats.games>=1)g('first_game');
+  if(stats.bestScore>=100)g('score_100');
+  if(stats.bestScore>=500)g('score_500');
+  if(stats.bestScore>=1000)g('score_1000');
+  if(stats.bestStreak>=5)g('streak_5');
+  if(stats.bestStreak>=10)g('streak_10');
+  if(stats.bestStreak>=20)g('streak_20');
+  if(stats.bestStreak>=50)g('streak_50');
+  if((stats.diffCounts&&stats.diffCounts['shredder']||0)>=1)g('play_shredder');
+  if(stats.games>=5)g('play_5');
+  if(stats.games>=20)g('play_20');
+  if(stats.totalHits>=50)g('hits_50');
+  if(stats.totalHits>=200)g('hits_200');
   if(state.extraLivesEarned>0)g('extra_life');
   if(state.gameMode==='timer'&&state.timerLeft>0)g('timer_win');
-  if((u.stats.practiceNotes||0)>=10)g('practice_10');
+  if((stats.practiceNotes||0)>=10)g('practice_10');
+  return newOnes;
 }
+
+// Keep checkAchievements as alias for backward compat
+function checkAchievements(u){ return getNewAchievements(u.stats||{},u.achievements||[]); }
 
 // ─────────────────────────────────────────────
 //  LEADERBOARD
@@ -1842,10 +1877,10 @@ function endGame(){
   document.getElementById('scale-mode-label').style.display='none';
   document.getElementById('stats').style.display='none';
   document.getElementById('pause-overlay').style.display='none';
-  addToLeaderboard(state.score,state.difficulty,state.gameMode,currentUser||'GUEST');
+  addToLeaderboard(state.score,state.difficulty,state.gameMode,currentUser?(currentUser.displayName||currentUser.email):'GUEST');
   const newAch=saveGameResult(state.score,state.hits,state.bestStreak,state.difficulty,state.gameMode);
   const saveMsg=currentUser
-    ? (newAch.length>0?`New achievement: ${ACHIEVEMENTS.find(a=>a.id===newAch[0])?.name}`:'Result saved.')
+    ? 'Result saved to your account.'
     : 'Log in to save your results.';
 
   // Consistent game-over screen matching challenge style
