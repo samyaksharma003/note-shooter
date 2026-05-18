@@ -1259,6 +1259,7 @@ function saveGameResult(score,hits,bestStreak,difficulty,mode){
   userRef.once('value').then(snap=>{
     const u = snap.val()||{stats:{games:0,bestScore:0,bestStreak:0,totalHits:0,diffCounts:{},practiceNotes:0},history:[],achievements:[]};
     if(!u.stats) u.stats={games:0,bestScore:0,bestStreak:0,totalHits:0,diffCounts:{},practiceNotes:0};
+    if(!u.stats.diffCounts) u.stats.diffCounts={};
     if(!u.achievements) u.achievements=[];
 
     u.stats.games++;
@@ -1284,6 +1285,7 @@ function saveGameResult(score,hits,bestStreak,difficulty,mode){
 function getNewAchievements(stats, existing){
   const newOnes=[];
   const g=(id)=>{ if(!existing.includes(id)) newOnes.push(id); };
+  const diffCounts = stats.diffCounts||{};
   if(stats.games>=1)g('first_game');
   if(stats.bestScore>=100)g('score_100');
   if(stats.bestScore>=500)g('score_500');
@@ -1292,7 +1294,7 @@ function getNewAchievements(stats, existing){
   if(stats.bestStreak>=10)g('streak_10');
   if(stats.bestStreak>=20)g('streak_20');
   if(stats.bestStreak>=50)g('streak_50');
-  if((stats.diffCounts&&stats.diffCounts['shredder']||0)>=1)g('play_shredder');
+  if((diffCounts['shredder']||0)>=1)g('play_shredder');
   if(stats.games>=5)g('play_5');
   if(stats.games>=20)g('play_20');
   if(stats.totalHits>=50)g('hits_50');
