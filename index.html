@@ -1097,7 +1097,7 @@ function openPanel(panel){
   const titles={account:'ACCOUNT',dashboard:'DASHBOARD',settings:'SETTINGS',help:'HELP'};
   document.getElementById('sp-panel-title').textContent=titles[panel]||panel.toUpperCase();
   if(panel==='account') refreshAccountPanel();
-  if(panel==='dashboard') refreshDashboardPanel();
+  if(panel==='dashboard'){ refreshDashboardPanel(); switchSbTab('history'); }
 }
 
 function closeSidebarPanel(){
@@ -1138,23 +1138,29 @@ function signOutGoogle(){
 firebase.auth().onAuthStateChanged(user=>{
   currentUser = user;
   updateSidebarUserInfo();
-  refreshAccountPanel();
   if(user){
-    // Ensure user profile exists in Firebase DB
     const userRef = firebase.database().ref('users/'+user.uid);
     userRef.once('value').then(snap=>{
       if(!snap.val()){
+        // New user — create record first, then refresh
         userRef.set({
           name: user.displayName,
           email: user.email,
           photo: user.photoURL||'',
           created: Date.now(),
           stats:{games:0,bestScore:0,bestStreak:0,totalHits:0,diffCounts:{},practiceNotes:0},
-          history:[],
+          history:{},
           achievements:[]
-        });
+        }).then(()=>{ refreshAccountPanel(); refreshDashboardPanel(); });
+      } else {
+        // Existing user — refresh immediately
+        refreshAccountPanel();
+        refreshDashboardPanel();
       }
     });
+  } else {
+    refreshAccountPanel();
+    refreshDashboardPanel();
   }
 });
 
@@ -1173,11 +1179,10 @@ function refreshAccountPanel(){
     profileSection.style.display='block';
     document.getElementById('sb-profile-name').textContent = currentUser.displayName||'User';
     document.getElementById('sb-profile-joined').textContent = currentUser.email||'';
-    // Show profile photo if available
     const photo = document.getElementById('sb-profile-photo');
     if(currentUser.photoURL){ photo.src=currentUser.photoURL; photo.style.display='block'; }
     else photo.style.display='none';
-    // Load stats from Firebase
+    // Always fetch fresh stats from Firebase
     firebase.database().ref('users/'+currentUser.uid+'/stats').once('value').then(snap=>{
       const s = snap.val()||{};
       document.getElementById('sb-stat-games').textContent  = s.games||0;
